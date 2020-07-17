@@ -1,0 +1,21 @@
+.bnf-add {
+    background-color: #ddddff;
+}
+
+.bnf-add:after {
+    content: '+';
+    vertical-align: super;
+    font-size: 1rem;
+    font-family: 'Charter-Racket', serif;
+}
+
+.bnf-sub {
+    background-color: #ffdddd;
+}
+
+.bnf-sub:after {
+    content: '–';
+    vertical-align: super;
+    font-size: 1rem;
+    font-family: 'Charter-Racket', serif;
+}
