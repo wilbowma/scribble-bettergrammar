@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require
+ racket/runtime-path
  racket/list
  scribble/base
  scribble/struct
@@ -19,6 +20,8 @@
  define-grammar
  typeset-grammar
  typeset-grammar-diff)
+
+(define-runtime-path css-path "bettergrammar.css")
 
 ;;;; Better versions of racketgrammar*:
 ;;;; - use ::= instead of =
@@ -114,7 +117,7 @@
 ;; but it doesn't nest well, apparently.
 ;; REALLY REALLY, I should maybe investigate make-element-id-transformers....
 ;; Anyway, as long as these are used as I've been using them, they're fine.
-(define better-bnf-props (list (make-css-addition "bettergrammar.css")))
+(define better-bnf-props (list (make-css-addition css-path)))
 (define bnf-add-style (make-style "bnf-add" better-bnf-props))
 (define bnf-sub-style (make-style "bnf-sub" better-bnf-props))
 
