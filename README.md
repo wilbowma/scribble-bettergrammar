@@ -8,3 +8,7 @@ grammars (using `sexp-diff`), and rendering grammar differences with both
 highlighting and annotations to emphasize what has changed between grammars.
 
 Currently only comes with built-in style for HTML backend, but it should be simple to write your own TeX style.
+
+An example from the docs:
+
+![Screenshot of an example from the docs](screenshot.png)
