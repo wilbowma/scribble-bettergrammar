@@ -122,9 +122,9 @@
 (define bnf-sub-style (make-style "bnf-sub" better-bnf-props))
 
 (define (bnf:add datum)
-   (make-element bnf-add-style (racketvarfont datum)))
+   (make-element bnf-add-style (racketvarfont (~a datum))))
 (define (bnf:sub datum)
-   (make-element bnf-sub-style (racketvarfont datum)))
+   (make-element bnf-sub-style (racketvarfont (~a datum))))
 
 ;; Need to extend this with code:hilite
 (require
@@ -215,7 +215,7 @@
 
 (define-syntax-rule (define-grammar name rest ...)
   (begin
-    (define-syntax name #'(rest ...))))
+    (define-syntax name '(rest ...))))
 
 (define-syntax (typeset-grammar stx)
    (syntax-case stx ()
@@ -225,16 +225,16 @@
 (define-syntax (typeset-grammar-diff stx)
    (syntax-case stx ()
      [(_ old-name new-name)
-      #`(bettergrammar* #,@(grammar-diff (syntax-local-value #'old-name)
+      #`(bettergrammar* #,@(grammar-diff stx
+                                         (syntax-local-value #'old-name)
                                          (syntax-local-value #'new-name)))]))
 (begin-for-syntax
   (require sexp-diff)
 
-  (define (grammar-diff old-g-stx new-g-stx)
-    (let ([diffed-grammar (car (sexp-diff (syntax->datum old-g-stx)
-                                          (syntax->datum new-g-stx)))])
+  (define (grammar-diff stx old-g new-g)
+    (let ([diffed-grammar (car (sexp-diff old-g new-g))])
       (datum->syntax
-       new-g-stx
+       stx
        (let loop ([pos 0])
          (if (eq? pos (length diffed-grammar))
              '()
@@ -244,14 +244,14 @@
                  [(eq? nt-def '#:old)
                   (let ([real-nt-def (list-ref diffed-grammar (add1 pos))])
                     (cons
-                     #`((#,#'unsyntax (bnf:sub (~a '#,(car real-nt-def))))
-                        #,@(cdr real-nt-def))
+                     `((,#'unsyntax (bnf:sub ',(car real-nt-def)))
+                        ,@(cdr real-nt-def))
                      (loop (+ 2 pos))))]
                  [(eq? nt-def '#:new)
                   (let ([real-nt-def (list-ref diffed-grammar (add1 pos))])
                     (cons
-                     #`((#,#'unsyntax (bnf:add (~a '#,(car real-nt-def))))
-                        #,@(cdr real-nt-def))
+                     `((,#'unsyntax (bnf:add ',(car real-nt-def)))
+                        ,@(cdr real-nt-def))
                      (loop (+ 2 pos))))]
                  [else
                   (cons
@@ -268,11 +268,11 @@
                   ;; Either '#:old, #:new, and atom, or a (non-atom) s-expr
                   [(eq? prod '#:old)
                    (cons
-                    #`(#,#'unsyntax (bnf:sub (~a '#,(list-ref prods (add1 pos)))))
+                    `(,#'unsyntax (bnf:sub ',(list-ref prods (add1 pos))))
                     (loop (+ 2 pos)))]
                   [(eq? prod '#:new)
                    (cons
-                    #`(#,#'unsyntax (bnf:add (~a '#,(list-ref prods (add1 pos)))))
+                    `(,#'unsyntax (bnf:add ',(list-ref prods (add1 pos))))
                     (loop (+ 2 pos)))]
                   [(not (list? prod))
                    (cons prod (loop (add1 pos)))]

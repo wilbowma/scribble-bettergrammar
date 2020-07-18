@@ -233,6 +233,12 @@ Typeset the grammar defined as @racket[id] using @racket[bettergramar*].
   (v (λ (x) e) natural ())
   (natural 0 (add1 natural)))
 
+
+@define-grammar[meow (e (1 ...)
+
+(3 ...))]
+@define-grammar[meow2 (e (2 ...))]
+
 @defform[(typeset-grammar-diff old-id new-id)]{
 Compute and typeset the differnce between the grammars defined as
 @racket[old-id] and @racket[new-id].
@@ -257,5 +263,20 @@ Renders a new grammar were non-terminals and productions from @racket[old-id] th
 
 @scribble-renders[
 @typeset-grammar-diff[stlc-grammar-v1 stlc-grammar-v2]
+]
+
+@scribble-example|{
+@define-grammar[meow (e (1 ...)
+
+(3 ...))]
+@define-grammar[meow2 (e (2 ...))]
+
+@typeset-grammar[meow]
+@typeset-grammar-diff[meow meow2]
+}|
+
+@scribble-renders[
+@typeset-grammar[meow]
+@typeset-grammar-diff[meow meow2]
 ]
 }
