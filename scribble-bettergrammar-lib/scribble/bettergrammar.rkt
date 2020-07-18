@@ -11,7 +11,8 @@
  (except-in scribble/manual racketgrammar*)
  (except-in scribble/private/manual-vars with-racket-variables)
  scribble/private/manual-utils
- racket/format)
+ racket/format
+ (for-syntax syntax/parse))
 
 (provide
  bettergrammar*
@@ -223,11 +224,15 @@
       #`(bettergrammar* #,@(syntax-local-value #'name))]))
 
 (define-syntax (typeset-grammar-diff stx)
-   (syntax-case stx ()
-     [(_ old-name new-name)
+   (syntax-parse stx
+     [(_ old-name:id new-name:id)
       #`(bettergrammar* #,@(grammar-diff stx
                                          (syntax-local-value #'old-name)
-                                         (syntax-local-value #'new-name)))]))
+                                         (syntax-local-value #'new-name)))]
+     [(_ clauses1 clauses2)
+      #`(bettergrammar* #,@(grammar-diff stx
+                                         (syntax->datum #'clauses1)
+                                         (syntax->datum #'clauses2)))]))
 (begin-for-syntax
   (require sexp-diff)
 

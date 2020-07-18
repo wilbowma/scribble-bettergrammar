@@ -234,17 +234,17 @@ Typeset the grammar defined as @racket[id] using @racket[bettergramar*].
   (natural 0 (add1 natural)))
 
 
-@define-grammar[meow (e (1 ...)
+@defform*[((typeset-grammar-diff old-id new-id)
+           (typeset-grammar-diff (old-clauses ...) (new-clauses ...)))]{
+Compute and typeset the differnce between two grammars.
+In the first form, the two grammars must have been previously defined using
+@racket[define-grammar].
+In the second form, the clauses should match the form of a @racket[racketgrammar*].
 
-(3 ...))]
-@define-grammar[meow2 (e (2 ...))]
-
-@defform[(typeset-grammar-diff old-id new-id)]{
-Compute and typeset the differnce between the grammars defined as
-@racket[old-id] and @racket[new-id].
-The two grammars must have been previously defined using @racket[define-grammar].
-Renders a new grammar were non-terminals and productions from @racket[old-id] that have been removed in @racket[new-id] are typeset with @racket[bnf:sub], and non-terminals and productions that have been added in @racket[new-id] are typeset with @racket[bnf:add].
-
+Renders a new grammar where non-terminals and productions the old grammar
+that have been removed in new grammar are typeset with @racket[bnf:sub], and
+non-terminals and productions that have been added in the new grammar are
+typeset with @racket[bnf:add].
 
 @scribble-example|{
 (define-grammar stlc-grammar-v1
@@ -266,17 +266,36 @@ Renders a new grammar were non-terminals and productions from @racket[old-id] th
 ]
 
 @scribble-example|{
-@define-grammar[meow (e (1 ...)
+@bettergrammar*[(e (1 ...)
 
 (3 ...))]
-@define-grammar[meow2 (e (2 ...))]
 
-@typeset-grammar[meow]
-@typeset-grammar-diff[meow meow2]
+@bettergrammar*[(e (2 ...))]
+
+@typeset-grammar-diff[
+((e (1 ...)
+
+(3 ...)))
+
+((e (2 ...)))
+]
 }|
 
 @scribble-renders[
-@typeset-grammar[meow]
-@typeset-grammar-diff[meow meow2]
+@bettergrammar*[(e (1 ...)
+
+(3 ...))]
+
+@bettergrammar*[(e (2 ...))]
+
+@typeset-grammar-diff[
+((e (1 ...)
+
+(3 ...)))
+
+((e (2 ...)))
 ]
+]
+
+@history[#:added "1.1" "Support for second, anonymous form."]
 }
