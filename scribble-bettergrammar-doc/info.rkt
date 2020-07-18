@@ -1,6 +1,7 @@
 #lang info
 (define build-deps
-  '("base"
+  '("scribble-bettergrammar-lib"
+    "base"
     "scribble-lib"
     "racket-doc"
     "scribble-doc"
@@ -8,3 +9,4 @@
 (define pkg-desc "Documentation for scribble-bettergrammar")
 (define pkg-authors '(wilbowma))
 (define version "1.0")
+(define deps '("base"))
