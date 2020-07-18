@@ -12,64 +12,74 @@
  (except-in scribble/private/manual-vars with-racket-variables)
  scribble/private/manual-utils
  racket/format
- (for-syntax syntax/parse))
+ (for-syntax
+  racket/base
+  syntax/parse))
 
 (provide
  bettergrammar*
+ (rename-out [bettergrammar* typeset-grammar])
  bnf:add
  bnf:sub
  define-grammar
- typeset-grammar
- typeset-grammar-diff)
+ bettergrammar*-diff
+ (rename-out [bettergrammar*-diff typeset-grammar-diff]))
 
 (define-runtime-path css-path "bettergrammar.css")
 
-;;;; Better versions of racketgrammar*:
-;;;; - use ::= instead of =
-;;;; - allow +::= and -::= for typesetting changes
+(define-syntax-rule (define-grammar name rest ...)
+  (begin
+    (define-syntax name '(rest ...))))
 
-(define-syntax bettergrammar*
-  (syntax-rules ()
+(define-syntax (bettergrammar* stx)
+  (syntax-parse stx
     [(_ #:literals (lit ...)
         ([addid addclause ...] ...)
         ([subid subclause ...] ...)
         ([id clause ...] ...))
-     (with-racket-variables
-       (lit ...)
-       ([non-term ((id clause ...) ...
-                   (subid subclause ...) ...
-                   (addid addclause ...) ...)])
-       (*racketgrammar
-        (lambda ()
-          (list (list (racket addid)
-                      (racketblock0/form addclause) ...)
-                ...))
-        (lambda ()
-          (list (list (racket subid)
-                      (racketblock0/form subclause) ...)
-                ...))
-        (lambda ()
-          (list (list (racket id)
-                      (racketblock0/form clause) ...)
-                ...))))]
+     (syntax/loc stx
+       (with-racket-variables
+         (lit ...)
+         ([non-term ((id clause ...) ...
+                     (subid subclause ...) ...
+                     (addid addclause ...) ...)])
+         (*racketgrammar
+          (lambda ()
+            (list (list (racket addid)
+                        (racketblock0/form addclause) ...)
+                  ...))
+          (lambda ()
+            (list (list (racket subid)
+                        (racketblock0/form subclause) ...)
+                  ...))
+          (lambda ()
+            (list (list (racket id)
+                        (racketblock0/form clause) ...)
+                  ...)))))]
     [(_ ([addid addclause ...] ...)
         ([subid subclause ...] ...)
         ([id clause ...] ...))
-     (bettergrammar* #:literals ()
-                     ([addid addclause ...] ...)
-                     ([subid subclause ...] ...)
-                     ([id clause ...] ...))]
+     (syntax/loc stx
+         (bettergrammar* #:literals ()
+                         ([addid addclause ...] ...)
+                         ([subid subclause ...] ...)
+                         ([id clause ...] ...)))]
     [(_ #:literals (lit ...)
         [id clause ...] ...)
-     (bettergrammar* #:literals (lit ...)
-                     ()
-                     ()
-                     ([id clause ...] ...))]
+     (syntax/loc stx
+       (bettergrammar* #:literals (lit ...)
+                       ()
+                       ()
+                       ([id clause ...] ...)))]
     [(_ [id clause ...] ...)
-     (bettergrammar* #:literals ()
-                     ()
-                     ()
-                     ([id clause ...] ...))]))
+     (syntax/loc stx
+       (bettergrammar* #:literals ()
+                       ()
+                       ()
+                       ([id clause ...] ...)))]
+    [(_ id)
+     (quasisyntax/loc stx
+       (bettergrammar* #:literals () () () #,(syntax-local-value #'id)))]))
 
 (define (*racketgrammar addclauseses-thunk subclauseses-thunk clauseses-thunk)
   (define (nontermify x)
@@ -130,7 +140,6 @@
 ;; Need to extend this with code:hilite
 (require
  (for-syntax
-  racket/base
   syntax/boundmap))
 (define-syntax (with-racket-variables stx)
   (syntax-case stx ()
@@ -214,16 +223,7 @@
              body)))]))
 
 
-(define-syntax-rule (define-grammar name rest ...)
-  (begin
-    (define-syntax name '(rest ...))))
-
-(define-syntax (typeset-grammar stx)
-   (syntax-case stx ()
-     [(_ name)
-      #`(bettergrammar* #,@(syntax-local-value #'name))]))
-
-(define-syntax (typeset-grammar-diff stx)
+(define-syntax (bettergrammar*-diff stx)
    (syntax-parse stx
      [(_ old-name:id new-name:id)
       #`(bettergrammar* #,@(grammar-diff stx

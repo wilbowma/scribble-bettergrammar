@@ -32,15 +32,48 @@ highlighting and annotations to emphasize what has changed between grammars.
     @para{Renders like:}
     @(apply nested #:style 'inset rest)))
 
+@(define-grammar stlc-grammar (e (λ (x) e) (e e) x))
+
+@(define-grammar stlc-grammar-v
+(e (λ (x) e) (e e) x v)
+(v natural ()))
+
+
+@defform[(define-grammar id clauses ...)]{
+Defines @racket[id] as a grammar to be typeset by @racket[typeset-grammar] and
+@racket[typeset-grammar-diff].
+The @racket[clauses ...] are the same as specified by @racket[bettergrammar*].
+
+Does not render anything by on its own.
+
+Must be used in definition context.
+
+@examples[
+(require scribble/bettergrammar)
+(define-grammar stlc-grammar (e (λ (x) e) (e e) x))
+]
+
+@scribble-example|{
+@bettergrammar*[stlc-grammar]
+}|
+
+@scribble-renders[
+@bettergrammar*[stlc-grammar]
+]
+}
+
 @defform*[((bettergrammar* maybe-literals
                            ([addid clause-datum ...+] ...)
                            ([subid clause-datum ...+] ...)
                            ([id clause-datum ...+] ...))
            (bettergrammar* maybe-literals
-                           [id clause-datum ...+] ...))]{
+                           [id clause-datum ...+] ...)
+           (bettergrammar* id))]{
 Like @racket[racketgrammar*], but supports typesetting a grammar with difference
-annotations for non-terminals. @racket[maybe-literals] have the same
-interpretation as in @racket[racketgrammar*].
+annotations for non-terminals, and typesetting grammars pre-defined using
+@racket[define-grammar].
+@racket[maybe-literals] have the same interpretation as in
+@racket[racketgrammar*].
 
 The @racket[addid] clauses are typeset as additions to the grammar, using
 @racket[+::=] instead of @racket[::=] to indicate the addition to an existing
@@ -110,7 +143,22 @@ Scribble element transformers, such as @racket[code:hilite].
 (e (code:hilite v) (λ (x) e) x (e e))
 (v natural ())
 ]
+
+@examples[
+(require scribble/bettergrammar)
+(define-grammar stlc-grammar (e (λ (x) e) (e e) x))
 ]
+
+@scribble-example|{
+@bettergrammar*[stlc-grammar]
+}|
+
+@scribble-renders[
+@bettergrammar*[stlc-grammar]
+]
+]
+
+@history[#:changed "1.2" @elem{Merged functionality from @racket[typeset-grammar-diff] into this form.}]
 }
 
 @defproc[(bnf:add [datum string?]) string?]{
@@ -177,36 +225,6 @@ As it works over decoded strings, it can also be used outside of
 ]
 }
 
-@(define-grammar stlc-grammar (e (λ (x) e) (e e) x))
-
-@(define-grammar stlc-grammar-v
-  (e (λ (x) e) (e e) x v)
-  (v natural ()))
-
-
-@defform[(define-grammar id clauses ...)]{
-Defines @racket[id] as a grammar to be typeset by @racket[typeset-grammar] and
-@racket[typeset-grammar-diff].
-The @racket[clauses ...] are the same as specified by @racket[bettergrammar*].
-
-Does not render anything by on its own.
-
-Must be used in definition context.
-
-@examples[
-(require scribble/bettergrammar)
-(define-grammar stlc-grammar (e (λ (x) e) (e e) x))
-]
-
-@scribble-example|{
-@typeset-grammar[stlc-grammar]
-}|
-
-@scribble-renders[
-@typeset-grammar[stlc-grammar]
-]
-}
-
 @defform[(typeset-grammar id)]{
 Typeset the grammar defined as @racket[id] using @racket[bettergramar*].
 @racket[id] must have been previously defined by @racket[define-grammar].
@@ -222,6 +240,9 @@ Typeset the grammar defined as @racket[id] using @racket[bettergramar*].
 @scribble-renders[
 @typeset-grammar[stlc-grammar]
 ]
+
+@deprecated[#:what "form" @racket[bettergrammar*] @elem{Functionality merged into @racket[bettergrammar*]; exists for backwards compatibility and will eventually be removed.}]
+@history[#:changed "1.2" "Deprecated"]
 }
 
 @(define-grammar stlc-grammar-v1
@@ -233,9 +254,8 @@ Typeset the grammar defined as @racket[id] using @racket[bettergramar*].
   (v (λ (x) e) natural ())
   (natural 0 (add1 natural)))
 
-
-@defform*[((typeset-grammar-diff old-id new-id)
-           (typeset-grammar-diff (old-clauses ...) (new-clauses ...)))]{
+@defform*[((bettergrammar*-diff old-id new-id)
+           (bettergrammar*-diff (old-clauses ...) (new-clauses ...)))]{
 Compute and typeset the differnce between two grammars.
 In the first form, the two grammars must have been previously defined using
 @racket[define-grammar].
@@ -258,11 +278,11 @@ typeset with @racket[bnf:add].
 }|
 
 @scribble-example|{
-@typeset-grammar-diff[stlc-grammar-v1 stlc-grammar-v2]
+@bettergramar*-diff[stlc-grammar-v1 stlc-grammar-v2]
 }|
 
 @scribble-renders[
-@typeset-grammar-diff[stlc-grammar-v1 stlc-grammar-v2]
+@bettergrammar*-diff[stlc-grammar-v1 stlc-grammar-v2]
 ]
 
 @scribble-example|{
@@ -272,7 +292,7 @@ typeset with @racket[bnf:add].
 
 @bettergrammar*[(e (2 ...))]
 
-@typeset-grammar-diff[
+@bettergrammar*-diff[
 ((e (1 ...)
 
 (3 ...)))
@@ -288,7 +308,7 @@ typeset with @racket[bnf:add].
 
 @bettergrammar*[(e (2 ...))]
 
-@typeset-grammar-diff[
+@bettergrammar*-diff[
 ((e (1 ...)
 
 (3 ...)))
@@ -297,5 +317,13 @@ typeset with @racket[bnf:add].
 ]
 ]
 
-@history[#:added "1.1" "Support for second, anonymous form."]
+@history[#:changed "1.1" "Support for second, anonymous form."
+         #:changed "1.2" @elem{Renamed from @racket[typeset-grammar-diff]}]
+}
+
+@defidform[typeset-grammar-diff]{
+An alias for @racket[bettergrammar*-diff] for backwards compatibility.
+
+@deprecated[#:what "form" @racket[bettergrammar*-diff] @elem{Renamed to @racket[bettergrammar*-diff] for nicer interface; exists for backwards compatibility and will eventually be removed.}]
+@history[#:changed "1.2" "Made an alias; deprecated"]
 }
