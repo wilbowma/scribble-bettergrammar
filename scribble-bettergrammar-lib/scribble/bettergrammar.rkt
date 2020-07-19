@@ -225,22 +225,44 @@
 
 (define-syntax (bettergrammar*-diff stx)
    (syntax-parse stx
-     [(_ old-name:id new-name:id)
+     [(_ (~optional (~seq (~datum #:include)
+                          (include-nt:id ...)))
+         (~optional (~seq (~datum #:exclude)
+                          (exclude-nt:id ...)))
+         old-name:id new-name:id)
       #`(bettergrammar* #,@(grammar-diff stx
                                          (syntax-local-value #'old-name)
-                                         (syntax-local-value #'new-name)))]
-     [(_ clauses1 clauses2)
+                                         (syntax-local-value #'new-name)
+                                         (attribute include-nt)
+                                         (attribute exclude-nt)))]
+     [(_ (~optional (~seq (~datum #:include)
+                          (include-nt:id ...)))
+         (~optional (~seq (~datum #:exclude)
+                          (exclude-nt:id ...)))
+         clauses1 clauses2)
       #`(bettergrammar* #,@(grammar-diff stx
                                          (syntax->datum #'clauses1)
-                                         (syntax->datum #'clauses2)))]))
+                                         (syntax->datum #'clauses2)
+                                         (attribute include-nt)
+                                         (attribute exclude-nt)))]))
 (begin-for-syntax
   (require sexp-diff)
 
-  (define (grammar-diff stx old-g new-g)
+  (define (grammar-diff stx old-g new-g include-nts exclude-nts)
     (let ([diffed-grammar (car (sexp-diff old-g new-g))])
       (datum->syntax
        stx
-       (let loop ([pos 0])
+       (filter (let ([include-nts
+                      (when include-nts (map syntax->datum include-nts))]
+                     [exclude-nts
+                      (when exclude-nts (map syntax->datum exclude-nts))])
+                 (lambda (x)
+                   (and
+                    (or (void? include-nts)
+                        (memq (car x) include-nts))
+                    (or (void? exclude-nts)
+                        (not (memq (car x) exclude-nts))))))
+        (let loop ([pos 0])
          (if (eq? pos (length diffed-grammar))
              '()
              (let ([nt-def (list-ref diffed-grammar pos)])
@@ -261,7 +283,7 @@
                  [else
                   (cons
                    (cons (car nt-def) (render-s-expr-diff (cdr nt-def)))
-                   (loop (add1 pos)))])))))))
+                   (loop (add1 pos)))]))))))))
 
   (define (render-s-expr-diff prods)
     (if (list? prods)

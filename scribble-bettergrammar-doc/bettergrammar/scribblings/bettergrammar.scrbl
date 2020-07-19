@@ -254,12 +254,20 @@ Typeset the grammar defined as @racket[id] using @racket[bettergramar*].
   (v (λ (x) e) natural ())
   (natural 0 (add1 natural)))
 
-@defform*[((bettergrammar*-diff old-id new-id)
-           (bettergrammar*-diff (old-clauses ...) (new-clauses ...)))]{
+@defform*[((bettergrammar*-diff maybe-include maybe-exclude old-id new-id)
+(bettergrammar*-diff maybe-include maybe-exclude (old-clauses ...) (new-clauses ...)))
+           #:grammar [(maybe-include (code:line) (#:include (id ...)))
+                      (maybe-exclude (code:line) (#:include (id ...)))]]{
 Compute and typeset the differnce between two grammars.
 In the first form, the two grammars must have been previously defined using
 @racket[define-grammar].
 In the second form, the clauses should match the form of a @racket[racketgrammar*].
+
+If the optional @racket[maybe-include] is given, then only the nonterminals
+specified in @racket[(id ...)] are included in the rendered grammar.
+
+If the optional @racket[maybe-exclude] is given, then any nonterminals
+specified in @racket[(id ...)] are excluded from the rendered grammar.
 
 Renders a new grammar where non-terminals and productions the old grammar
 that have been removed in new grammar are typeset with @racket[bnf:sub], and
@@ -283,6 +291,22 @@ typeset with @racket[bnf:add].
 
 @scribble-renders[
 @bettergrammar*-diff[stlc-grammar-v1 stlc-grammar-v2]
+]
+
+@scribble-example|{
+@bettergramar*-diff[#:include (e) stlc-grammar-v1 stlc-grammar-v2]
+}|
+
+@scribble-renders[
+@bettergrammar*-diff[#:include (e) stlc-grammar-v1 stlc-grammar-v2]
+]
+
+@scribble-example|{
+@bettergramar*-diff[#:exclude (e) stlc-grammar-v1 stlc-grammar-v2]
+}|
+
+@scribble-renders[
+@bettergrammar*-diff[#:exclude (e) stlc-grammar-v1 stlc-grammar-v2]
 ]
 
 @scribble-example|{
@@ -318,7 +342,8 @@ typeset with @racket[bnf:add].
 ]
 
 @history[#:changed "1.1" "Support for second, anonymous form."
-         #:changed "1.2" @elem{Renamed from @racket[typeset-grammar-diff]}]
+         #:changed "1.2" @elem{Renamed from @racket[typeset-grammar-diff]}
+         #:changed "1.3" @elem{Added @racket[#:include] and @racket[#:exclude] support.}]
 }
 
 @defidform[typeset-grammar-diff]{
