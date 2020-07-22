@@ -21,6 +21,8 @@
  (rename-out [bettergrammar* typeset-grammar])
  bnf:add
  bnf:sub
+ bnf-add
+ bnf-sub
  define-grammar
  bettergrammar*-diff
  (rename-out [bettergrammar*-diff typeset-grammar-diff]))
@@ -29,7 +31,7 @@
 
 (define-syntax-rule (define-grammar name rest ...)
   (begin
-    (define-syntax name '(rest ...))))
+    (define-syntax name (quote-syntax (rest ...)))))
 
 (define-syntax (bettergrammar* stx)
   (syntax-parse stx
@@ -123,19 +125,23 @@
      (append-map (typeset-bnf "-::=") subnonterms subclauseses)
      (append-map (typeset-bnf "::=") nonterms clauseses)))))
 
-;; Would be nice to support these escapes primitively, but requires more hacking.
-;; TODO: racketvarfont is the wrong thing. Really, should use racketblock0/form,
-;; but it doesn't nest well, apparently.
-;; REALLY REALLY, I should maybe investigate make-element-id-transformers....
-;; Anyway, as long as these are used as I've been using them, they're fine.
 (define better-bnf-props (list (make-css-addition css-path)))
 (define bnf-add-style (make-style "bnf-add" better-bnf-props))
 (define bnf-sub-style (make-style "bnf-sub" better-bnf-props))
 
-(define (bnf:add datum)
-   (make-element bnf-add-style (racketvarfont (~a datum))))
-(define (bnf:sub datum)
-   (make-element bnf-sub-style (racketvarfont (~a datum))))
+;; Backwards compatibility
+(define (bnf:add v)
+  (make-element bnf-add-style (racketvarfont v)))
+
+(define (bnf:sub v)
+  (make-element bnf-sub-style (racketvarfont v)))
+
+;; TODO: Document and maybe deprecate above interface.
+(define-syntax-rule (bnf-add x)
+  (make-element bnf-add-style (racket x)))
+
+(define-syntax-rule (bnf-sub x)
+  (make-element bnf-sub-style (racket x)))
 
 ;; Need to extend this with code:hilite
 (require
@@ -222,68 +228,86 @@
          #'(letrec-syntaxes ([(id) (make-variable-id 'id)] ...)
              body)))]))
 
-
 (define-syntax (bettergrammar*-diff stx)
    (syntax-parse stx
      [(_ (~optional (~seq (~datum #:include)
                           (include-nt:id ...)))
          (~optional (~seq (~datum #:exclude)
                           (exclude-nt:id ...)))
-         old-name:id new-name:id)
-      #`(bettergrammar* #,@(grammar-diff stx
-                                         (syntax-local-value #'old-name)
-                                         (syntax-local-value #'new-name)
-                                         (attribute include-nt)
-                                         (attribute exclude-nt)))]
+         old-name:id expr)
+      (quasisyntax/loc stx
+        (bettergrammar*-diff (~? (~@ #:include (include-nt ...)))
+                             (~? (~@ #:exclude (exclude-nt ...)))
+                             #,(cdr (syntax-local-value #'old-name))
+                             expr))]
+     [(_ (~optional (~seq (~datum #:include)
+                          (include-nt:id ...)))
+         (~optional (~seq (~datum #:exclude)
+                          (exclude-nt:id ...)))
+         clauses1 new-name:id)
+      (quasisyntax/loc stx
+        (bettergrammar*-diff (~? (~@ #:include (include-nt ...)))
+                             (~? (~@ #:exclude (exclude-nt ...)))
+                             clauses1
+                             #,(cdr (syntax-local-value #'new-name))))]
      [(_ (~optional (~seq (~datum #:include)
                           (include-nt:id ...)))
          (~optional (~seq (~datum #:exclude)
                           (exclude-nt:id ...)))
          clauses1 clauses2)
-      #`(bettergrammar* #,@(grammar-diff stx
-                                         (syntax->datum #'clauses1)
-                                         (syntax->datum #'clauses2)
-                                         (attribute include-nt)
-                                         (attribute exclude-nt)))]))
+      (let-values ([(annotated-grammar fixup-nts)
+                    (grammar-diff stx
+                                  #'clauses1
+                                  #'clauses2
+                                  (attribute include-nt)
+                                  (attribute exclude-nt))])
+        (with-syntax ([(nts ...) (datum->syntax this-syntax fixup-nts)])
+          #`(letrec-syntaxes ([(nts) (make-variable-id 'nts)] ...)
+              (bettergrammar* #,@annotated-grammar))))]))
 (begin-for-syntax
   (require sexp-diff)
 
-  (define (grammar-diff stx old-g new-g include-nts exclude-nts)
-    (let ([diffed-grammar (car (sexp-diff old-g new-g))])
-      (datum->syntax
-       stx
-       (filter (let ([include-nts
-                      (when include-nts (map syntax->datum include-nts))]
-                     [exclude-nts
-                      (when exclude-nts (map syntax->datum exclude-nts))])
-                 (lambda (x)
-                   (and
-                    (or (void? include-nts)
-                        (memq (car x) include-nts))
-                    (or (void? exclude-nts)
-                        (not (memq (car x) exclude-nts))))))
-        (let loop ([pos 0])
-         (if (eq? pos (length diffed-grammar))
-             '()
-             (let ([nt-def (list-ref diffed-grammar pos)])
-               ;; Either '#:old, #:new, or a non-terminal definition
-               (cond
-                 [(eq? nt-def '#:old)
-                  (let ([real-nt-def (list-ref diffed-grammar (add1 pos))])
-                    (cons
-                     `((,#'unsyntax (bnf:sub ',(car real-nt-def)))
-                        ,@(cdr real-nt-def))
-                     (loop (+ 2 pos))))]
-                 [(eq? nt-def '#:new)
-                  (let ([real-nt-def (list-ref diffed-grammar (add1 pos))])
-                    (cons
-                     `((,#'unsyntax (bnf:add ',(car real-nt-def)))
-                        ,@(cdr real-nt-def))
-                     (loop (+ 2 pos))))]
-                 [else
-                  (cons
-                   (cons (car nt-def) (render-s-expr-diff (cdr nt-def)))
-                   (loop (add1 pos)))]))))))))
+  (define (grammar-diff stx old-g-stxs new-g-stxs include-nts exclude-nts)
+    (let ([diffed-grammar (car (sexp-diff (syntax->datum old-g-stxs) (syntax->datum new-g-stxs)))]
+          [fixup-nts (box '())])
+      (values
+       (datum->syntax
+        stx
+        (filter (let ([include-nts
+                       (when include-nts (map syntax->datum include-nts))]
+                      [exclude-nts
+                       (when exclude-nts (map syntax->datum exclude-nts))])
+                  (lambda (x)
+                    (and
+                     (or (void? include-nts)
+                         (memq (car x) include-nts))
+                     (or (void? exclude-nts)
+                         (not (memq (car x) exclude-nts))))))
+                (let loop ([pos 0])
+                  (if (eq? pos (length diffed-grammar))
+                      '()
+                      (let ([nt-def (list-ref diffed-grammar pos)])
+                        ;; Either '#:old, #:new, or a non-terminal definition
+                        (cond
+                          [(eq? nt-def '#:old)
+                           (let ([real-nt-def (list-ref diffed-grammar (add1 pos))])
+                             (set-box! fixup-nts (cons (car real-nt-def) (unbox fixup-nts)))
+                             (cons
+                              `((,#'unsyntax (bnf-sub ,(car real-nt-def)))
+                                ,@(cdr real-nt-def))
+                              (loop (+ 2 pos))))]
+                          [(eq? nt-def '#:new)
+                           (let ([real-nt-def (list-ref diffed-grammar (add1 pos))])
+                             (set-box! fixup-nts (cons (car real-nt-def) (unbox fixup-nts)))
+                             (cons
+                              `((,#'unsyntax (bnf-add ,(car real-nt-def)))
+                                ,@(cdr real-nt-def))
+                              (loop (+ 2 pos))))]
+                          [else
+                           (cons
+                            (cons (car nt-def) (render-s-expr-diff (cdr nt-def)))
+                            (loop (add1 pos)))]))))))
+       (unbox fixup-nts))))
 
   (define (render-s-expr-diff prods)
     (if (list? prods)
@@ -295,11 +319,11 @@
                   ;; Either '#:old, #:new, and atom, or a (non-atom) s-expr
                   [(eq? prod '#:old)
                    (cons
-                    `(,#'unsyntax (bnf:sub ',(list-ref prods (add1 pos))))
+                    `(,#'unsyntax (bnf-sub ,(list-ref prods (add1 pos))))
                     (loop (+ 2 pos)))]
                   [(eq? prod '#:new)
                    (cons
-                    `(,#'unsyntax (bnf:add ',(list-ref prods (add1 pos))))
+                    `(,#'unsyntax (bnf-add ,(list-ref prods (add1 pos))))
                     (loop (+ 2 pos)))]
                   [(not (list? prod))
                    (cons prod (loop (add1 pos)))]
