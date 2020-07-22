@@ -29,9 +29,11 @@
 
 (define-runtime-path css-path "bettergrammar.css")
 
-(define-syntax-rule (define-grammar name rest ...)
-  (begin
-    (define-syntax name (quote-syntax (rest ...)))))
+(define-syntax (define-grammar stx)
+  (syntax-parse stx
+    [(_ name (~optional (~seq #:literals (id ...))) rest ...)
+     (quasisyntax/loc stx
+       (define-syntax name (cons #'(~? (id ...) ()) (quote-syntax #,(attribute rest)))))]))
 
 (define-syntax (bettergrammar* stx)
   (syntax-parse stx
@@ -80,8 +82,9 @@
                        ()
                        ([id clause ...] ...)))]
     [(_ id)
-     (quasisyntax/loc stx
-       (bettergrammar* #:literals () () () #,(syntax-local-value #'id)))]))
+     (let ([v (syntax-local-value #'id)])
+       (quasisyntax/loc stx
+         (bettergrammar* #:literals #,(car v) () () #,(cdr v))))]))
 
 (define (*racketgrammar addclauseses-thunk subclauseses-thunk clauseses-thunk)
   (define (nontermify x)
