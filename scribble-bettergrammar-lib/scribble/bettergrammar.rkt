@@ -323,47 +323,69 @@
          (~optional (~seq (~datum #:datum-literals)
                           (did:id ...)))
          clauses1 clauses2)
-      (let-values ([(annotated-grammar fixup-nts)
+      (let-values ([(annotated-grammar)
                     (grammar-diff stx
                                   #'clauses1
                                   #'clauses2
                                   (attribute include-nt)
                                   (attribute exclude-nt))])
-        (with-syntax ([(nts ...) (datum->syntax this-syntax fixup-nts)])
-          #`(letrec-syntaxes ([(nts) (make-variable-id 'nts)] ...)
-              (bettergrammar* (~? (~@ #:literals (lid ...)))
-                              (~? (~@ #:datum-literals (did ...)))
-                              #,@annotated-grammar))))]))
+        #`(bettergrammar* (~? (~@ #:literals (lid ...)))
+                          (~? (~@ #:datum-literals (did ...)))
+                          #,@annotated-grammar))]))
 (begin-for-syntax
-  (require "stx-diff.rkt" racket/function syntax/stx)
+  (require sexp-diff/stx-diff racket/function syntax/stx)
+
+  (define (maybe/free-identifier=? id1 id2)
+    (and (identifier? id1) (identifier? id2) (free-identifier=? id1 id2)))
+
+  (define (maybe/map f e)
+    (if (pair? e)
+        (cons (f (car e)) (maybe/map f (cdr e)))
+        (f e)))
+
+  (define (erase-srcloc old)
+    (if (syntax? old)
+        (datum->syntax (syntax-disarm old #f)
+                   (maybe/map erase-srcloc (syntax-e (syntax-disarm old #f)))
+                   #f
+                   old)
+        old))
 
   (define (grammar-diff stx old-g-stxs new-g-stxs include-nts exclude-nts)
     (let ([diffed-grammar (stx-car (stx-diff old-g-stxs new-g-stxs
                                              #:old-marker (lambda (x)
                                                             (quasisyntax/loc x
-                                                              (#,#'unsyntax (bnf-sub #,x))))
+                                                              ((#,#'unsyntax (bnf-sub #,x)))))
                                              #:new-marker (lambda (x)
                                                             (quasisyntax/loc x
-                                                              (#,#'unsyntax (bnf-add #,x))))))]
+                                                              ((#,#'unsyntax (bnf-add #,x)))))))]
           [fixup-nts (box '())])
-      (values
-       (map (lambda (x)
-              ;; fix up when nt is deleted.
+      (map (compose
+            ;; Regularize the srclocs of each production. This disrupts the
+            ;; original typesetting based on source locations, but that
+            ;; information is disrupted anyway when computing the diff.
+            (lambda (x)
+              (syntax-parse x
+                [(nt prods ...)
+                 (quasisyntax/loc this-syntax
+                   (#,(erase-srcloc (attribute nt)) #,@(map erase-srcloc (attribute prods))))]))
+            ;; Fix up when nt is deleted. The diff algorithm puts the annotation
+            ;; in the wrong spot for typesetting.
+            (lambda (x)
               (syntax-parse x
                 [((~and us (~literal unsyntax)) (annotator (nt prods ...)))
                  (quasisyntax/loc x
                    ((us (annotator nt))
                     prods ...))]
-                [_ x]))
-            (filter (let ([include-nts
-                           (when include-nts include-nts)]
-                          [exclude-nts
-                           (when exclude-nts exclude-nts)])
-                      (lambda (x)
-                        (and
-                         (or (void? include-nts)
-                             (findf (curry maybe/free-identifier=? (stx-car x)) include-nts))
-                         (or (void? exclude-nts)
-                             (not (findf (curry maybe/free-identifier=? (stx-car x)) exclude-nts))))))
-                    (syntax->list diffed-grammar)))
-       (unbox fixup-nts)))))
+                [_ x])))
+           (filter (let ([include-nts
+                          (when include-nts include-nts)]
+                         [exclude-nts
+                          (when exclude-nts exclude-nts)])
+                     (lambda (x)
+                       (and
+                        (or (void? include-nts)
+                            (findf (curry maybe/free-identifier=? (stx-car x)) include-nts))
+                        (or (void? exclude-nts)
+                            (not (findf (curry maybe/free-identifier=? (stx-car x)) exclude-nts))))))
+                   (syntax->list diffed-grammar))))))
