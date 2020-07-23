@@ -3,6 +3,7 @@
 (require
  racket/runtime-path
  racket/list
+ (for-syntax racket/list)
  scribble/base
  scribble/struct
  scribble/racket
@@ -31,9 +32,13 @@
 
 (define-syntax (define-grammar stx)
   (syntax-parse stx
-    [(_ name (~optional (~seq #:literals (id ...))) rest ...)
+    [(_ name (~optional (~seq #:literals (id ...)))
+        (~optional (~seq #:datum-literals (did ...)))
+        rest ...)
      (quasisyntax/loc stx
-       (define-syntax name (cons #'(~? (id ...) ()) (quote-syntax #,(attribute rest)))))]))
+       (define-syntax name (list #'(~? (id ...) ())
+                                 #'(~? (did ...) ())
+                                 (quote-syntax #,(attribute rest)))))]))
 
 (define-syntax (bettergrammar* stx)
   (syntax-parse stx
@@ -83,8 +88,15 @@
                        ([id clause ...] ...)))]
     [(_ id)
      (let ([v (syntax-local-value #'id)])
-       (quasisyntax/loc stx
-         (bettergrammar* #:literals #,(car v) () () #,(cdr v))))]))
+       (with-syntax ([(did ...) (second v)]
+                     [(id ...) (first v)])
+         (quasisyntax/loc stx
+           (letrec-syntaxes ([(did)
+                              (make-element-id-transformer
+                               (lambda (x)
+                                 #`(elem #:style keyword-color (to-element '#,x))))]
+                             ...)
+             (bettergrammar* #:literals (did ... id ...) () () #,(third v))))))]))
 
 (define (*racketgrammar addclauseses-thunk subclauseses-thunk clauseses-thunk)
   (define (nontermify x)
@@ -241,7 +253,7 @@
       (quasisyntax/loc stx
         (bettergrammar*-diff (~? (~@ #:include (include-nt ...)))
                              (~? (~@ #:exclude (exclude-nt ...)))
-                             #,(cdr (syntax-local-value #'old-name))
+                             #,(third (syntax-local-value #'old-name))
                              expr))]
      [(_ (~optional (~seq (~datum #:include)
                           (include-nt:id ...)))
@@ -252,7 +264,7 @@
         (bettergrammar*-diff (~? (~@ #:include (include-nt ...)))
                              (~? (~@ #:exclude (exclude-nt ...)))
                              clauses1
-                             #,(cdr (syntax-local-value #'new-name))))]
+                             #,(third (syntax-local-value #'new-name))))]
      [(_ (~optional (~seq (~datum #:include)
                           (include-nt:id ...)))
          (~optional (~seq (~datum #:exclude)
