@@ -335,68 +335,35 @@
                               (~? (~@ #:datum-literals (did ...)))
                               #,@annotated-grammar))))]))
 (begin-for-syntax
-  (require sexp-diff)
+  (require "stx-diff.rkt" racket/function syntax/stx)
 
   (define (grammar-diff stx old-g-stxs new-g-stxs include-nts exclude-nts)
-    (let ([diffed-grammar (car (sexp-diff (syntax->datum old-g-stxs) (syntax->datum new-g-stxs)))]
+    (let ([diffed-grammar (stx-car (stx-diff old-g-stxs new-g-stxs
+                                             #:old-marker (lambda (x)
+                                                            (quasisyntax/loc x
+                                                              (#,#'unsyntax (bnf-sub #,x))))
+                                             #:new-marker (lambda (x)
+                                                            (quasisyntax/loc x
+                                                              (#,#'unsyntax (bnf-add #,x))))))]
           [fixup-nts (box '())])
       (values
-       (datum->syntax
-        stx
-        (filter (let ([include-nts
-                       (when include-nts (map syntax->datum include-nts))]
-                      [exclude-nts
-                       (when exclude-nts (map syntax->datum exclude-nts))])
-                  (lambda (x)
-                    (and
-                     (or (void? include-nts)
-                         (memq (car x) include-nts))
-                     (or (void? exclude-nts)
-                         (not (memq (car x) exclude-nts))))))
-                (let loop ([pos 0])
-                  (if (eq? pos (length diffed-grammar))
-                      '()
-                      (let ([nt-def (list-ref diffed-grammar pos)])
-                        ;; Either '#:old, #:new, or a non-terminal definition
-                        (cond
-                          [(eq? nt-def '#:old)
-                           (let ([real-nt-def (list-ref diffed-grammar (add1 pos))])
-                             (set-box! fixup-nts (cons (car real-nt-def) (unbox fixup-nts)))
-                             (cons
-                              `((,#'unsyntax (bnf-sub ,(car real-nt-def)))
-                                ,@(cdr real-nt-def))
-                              (loop (+ 2 pos))))]
-                          [(eq? nt-def '#:new)
-                           (let ([real-nt-def (list-ref diffed-grammar (add1 pos))])
-                             (set-box! fixup-nts (cons (car real-nt-def) (unbox fixup-nts)))
-                             (cons
-                              `((,#'unsyntax (bnf-add ,(car real-nt-def)))
-                                ,@(cdr real-nt-def))
-                              (loop (+ 2 pos))))]
-                          [else
-                           (cons
-                            (cons (car nt-def) (render-s-expr-diff (cdr nt-def)))
-                            (loop (add1 pos)))]))))))
-       (unbox fixup-nts))))
-
-  (define (render-s-expr-diff prods)
-    (if (list? prods)
-        (let loop ([pos 0])
-          (if (eq? pos (length prods))
-              '()
-              (let ([prod (list-ref prods pos)])
-                (cond
-                  ;; Either '#:old, #:new, and atom, or a (non-atom) s-expr
-                  [(eq? prod '#:old)
-                   (cons
-                    `(,#'unsyntax (bnf-sub ,(list-ref prods (add1 pos))))
-                    (loop (+ 2 pos)))]
-                  [(eq? prod '#:new)
-                   (cons
-                    `(,#'unsyntax (bnf-add ,(list-ref prods (add1 pos))))
-                    (loop (+ 2 pos)))]
-                  [(not (list? prod))
-                   (cons prod (loop (add1 pos)))]
-                  [else
-                   (cons (render-s-expr-diff prod) (loop (add1 pos)))]))))
-        prods)))
+       (map (lambda (x)
+              ;; fix up when nt is deleted.
+              (syntax-parse x
+                [((~and us (~literal unsyntax)) (annotator (nt prods ...)))
+                 (quasisyntax/loc x
+                   ((us (annotator nt))
+                    prods ...))]
+                [_ x]))
+            (filter (let ([include-nts
+                           (when include-nts include-nts)]
+                          [exclude-nts
+                           (when exclude-nts exclude-nts)])
+                      (lambda (x)
+                        (and
+                         (or (void? include-nts)
+                             (findf (curry maybe/free-identifier=? (stx-car x)) include-nts))
+                         (or (void? exclude-nts)
+                             (not (findf (curry maybe/free-identifier=? (stx-car x)) exclude-nts))))))
+                    (syntax->list diffed-grammar)))
+       (unbox fixup-nts)))))
