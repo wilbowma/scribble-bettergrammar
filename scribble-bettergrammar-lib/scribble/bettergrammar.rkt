@@ -15,7 +15,8 @@
  racket/format
  (for-syntax
   racket/base
-  syntax/parse))
+  syntax/parse)
+ racket/stxparam)
 
 (provide
  bettergrammar*
@@ -40,6 +41,8 @@
                                  #'(~? (did ...) ())
                                  (quote-syntax #,(attribute rest)))))]))
 
+(define-syntax-parameter current-literals #'())
+
 (define-syntax (bettergrammar* stx)
   (syntax-parse stx
     [(_ #:literals (lit ...)
@@ -48,29 +51,30 @@
         ([subid subclause ...] ...)
         ([id clause ...] ...))
      (syntax/loc stx
-       (letrec-syntaxes ([(dlit)
-                          (make-element-id-transformer
-                           (lambda (x)
-                             #`(elem #:style symbol-color (to-element '#,x))))]
-                         ...)
-         (with-racket-variables
-           (lit ... dlit ...)
-           ([non-term ((id clause ...) ...
-                                       (subid subclause ...) ...
-                                       (addid addclause ...) ...)])
-           (*racketgrammar
-            (lambda ()
-              (list (list (racket addid)
-                          (racketblock0/form addclause) ...)
-                    ...))
-            (lambda ()
-              (list (list (racket subid)
-                          (racketblock0/form subclause) ...)
-                    ...))
-            (lambda ()
-              (list (list (racket id)
-                          (racketblock0/form clause) ...)
-                    ...))))))]
+       (syntax-parameterize ([current-literals #'(lit ...)])
+         (letrec-syntaxes ([(dlit)
+                            (make-element-id-transformer
+                             (lambda (x)
+                               #`(elem #:style symbol-color (to-element '#,x))))]
+                           ...)
+           (with-racket-variables
+             (lit ... dlit ...)
+             ([non-term ((id clause ...) ...
+                                         (subid subclause ...) ...
+                                         (addid addclause ...) ...)])
+             (*racketgrammar
+              (lambda ()
+                (list (list (racket addid)
+                            (racketblock0/form addclause) ...)
+                      ...))
+              (lambda ()
+                (list (list (racket subid)
+                            (racketblock0/form subclause) ...)
+                      ...))
+              (lambda ()
+                (list (list (racket id)
+                            (racketblock0/form clause) ...)
+                      ...)))))))]
     [(_ #:literals (lit ...)
         ([addid addclause ...] ...)
         ([subid subclause ...] ...)
@@ -187,11 +191,22 @@
   (make-element bnf-sub-style (racketvarfont v)))
 
 ;; TODO: Document and maybe deprecate above interface.
-(define-syntax-rule (bnf-add x)
-  (make-element bnf-add-style (racket x)))
+(define-for-syntax (interpose-on-rackergrammar src style stx)
+  (quasisyntax/loc src
+    (elem #:style #,style
+          (with-racket-variables #,(syntax-parameter-value #'current-literals)
+            ([non-term (#,stx)])
+            (racket/form #,stx)))))
 
-(define-syntax-rule (bnf-sub x)
-  (make-element bnf-sub-style (racket x)))
+(define-syntax (bnf-add stx)
+  (syntax-parse stx
+    [(_ expr)
+     (interpose-on-rackergrammar stx #'bnf-add-style #'expr)]))
+
+(define-syntax (bnf-sub stx)
+  (syntax-parse stx
+    [(_ expr)
+     (interpose-on-rackergrammar stx #'bnf-sub-style #'expr)]))
 
 ;; Need to extend this with code:hilite
 (require
@@ -323,80 +338,69 @@
          (~optional (~seq (~datum #:datum-literals)
                           (did:id ...)))
          clauses1 clauses2)
-      (let-values ([(annotated-grammar fixup-nts)
+      (let-values ([(annotated-grammar)
                     (grammar-diff stx
                                   #'clauses1
                                   #'clauses2
                                   (attribute include-nt)
                                   (attribute exclude-nt))])
-        (with-syntax ([(nts ...) (datum->syntax this-syntax fixup-nts)])
-          #`(letrec-syntaxes ([(nts) (make-variable-id 'nts)] ...)
-              (bettergrammar* (~? (~@ #:literals (lid ...)))
-                              (~? (~@ #:datum-literals (did ...)))
-                              #,@annotated-grammar))))]))
+        #`(bettergrammar* (~? (~@ #:literals (lid ...)))
+                          (~? (~@ #:datum-literals (did ...)))
+                          #,@annotated-grammar))]))
 (begin-for-syntax
-  (require sexp-diff)
+  (require sexp-diff/stx-diff racket/function syntax/stx)
+
+  (define (maybe/free-identifier=? id1 id2)
+    (and (identifier? id1) (identifier? id2) (free-identifier=? id1 id2)))
+
+  (define (maybe/map f e)
+    (if (pair? e)
+        (cons (f (car e)) (maybe/map f (cdr e)))
+        (f e)))
+
+  (define (erase-srcloc old)
+    (if (syntax? old)
+        (datum->syntax (syntax-disarm old #f)
+                   (maybe/map erase-srcloc (syntax-e (syntax-disarm old #f)))
+                   #f
+                   old)
+        old))
 
   (define (grammar-diff stx old-g-stxs new-g-stxs include-nts exclude-nts)
-    (let ([diffed-grammar (car (sexp-diff (syntax->datum old-g-stxs) (syntax->datum new-g-stxs)))]
+    (let ([diffed-grammar (stx-car (stx-diff old-g-stxs new-g-stxs
+                                             #:old-marker (lambda (x)
+                                                            (quasisyntax/loc x
+                                                              ((#,#'unsyntax (bnf-sub #,x)))))
+                                             #:new-marker (lambda (x)
+                                                            (quasisyntax/loc x
+                                                              ((#,#'unsyntax (bnf-add #,x)))))))]
           [fixup-nts (box '())])
-      (values
-       (datum->syntax
-        stx
-        (filter (let ([include-nts
-                       (when include-nts (map syntax->datum include-nts))]
-                      [exclude-nts
-                       (when exclude-nts (map syntax->datum exclude-nts))])
-                  (lambda (x)
-                    (and
-                     (or (void? include-nts)
-                         (memq (car x) include-nts))
-                     (or (void? exclude-nts)
-                         (not (memq (car x) exclude-nts))))))
-                (let loop ([pos 0])
-                  (if (eq? pos (length diffed-grammar))
-                      '()
-                      (let ([nt-def (list-ref diffed-grammar pos)])
-                        ;; Either '#:old, #:new, or a non-terminal definition
-                        (cond
-                          [(eq? nt-def '#:old)
-                           (let ([real-nt-def (list-ref diffed-grammar (add1 pos))])
-                             (set-box! fixup-nts (cons (car real-nt-def) (unbox fixup-nts)))
-                             (cons
-                              `((,#'unsyntax (bnf-sub ,(car real-nt-def)))
-                                ,@(cdr real-nt-def))
-                              (loop (+ 2 pos))))]
-                          [(eq? nt-def '#:new)
-                           (let ([real-nt-def (list-ref diffed-grammar (add1 pos))])
-                             (set-box! fixup-nts (cons (car real-nt-def) (unbox fixup-nts)))
-                             (cons
-                              `((,#'unsyntax (bnf-add ,(car real-nt-def)))
-                                ,@(cdr real-nt-def))
-                              (loop (+ 2 pos))))]
-                          [else
-                           (cons
-                            (cons (car nt-def) (render-s-expr-diff (cdr nt-def)))
-                            (loop (add1 pos)))]))))))
-       (unbox fixup-nts))))
-
-  (define (render-s-expr-diff prods)
-    (if (list? prods)
-        (let loop ([pos 0])
-          (if (eq? pos (length prods))
-              '()
-              (let ([prod (list-ref prods pos)])
-                (cond
-                  ;; Either '#:old, #:new, and atom, or a (non-atom) s-expr
-                  [(eq? prod '#:old)
-                   (cons
-                    `(,#'unsyntax (bnf-sub ,(list-ref prods (add1 pos))))
-                    (loop (+ 2 pos)))]
-                  [(eq? prod '#:new)
-                   (cons
-                    `(,#'unsyntax (bnf-add ,(list-ref prods (add1 pos))))
-                    (loop (+ 2 pos)))]
-                  [(not (list? prod))
-                   (cons prod (loop (add1 pos)))]
-                  [else
-                   (cons (render-s-expr-diff prod) (loop (add1 pos)))]))))
-        prods)))
+      (map (compose
+            ;; Regularize the srclocs of each production. This disrupts the
+            ;; original typesetting based on source locations, but that
+            ;; information is disrupted anyway when computing the diff.
+            (lambda (x)
+              (syntax-parse x
+                [(nt prods ...)
+                 (quasisyntax/loc this-syntax
+                   (#,(erase-srcloc (attribute nt)) #,@(map erase-srcloc (attribute prods))))]))
+            ;; Fix up when nt is deleted. The diff algorithm puts the annotation
+            ;; in the wrong spot for typesetting.
+            (lambda (x)
+              (syntax-parse x
+                [((~and us (~literal unsyntax)) (annotator (nt prods ...)))
+                 (quasisyntax/loc x
+                   ((us (annotator nt))
+                    prods ...))]
+                [_ x])))
+           (filter (let ([include-nts
+                          (when include-nts include-nts)]
+                         [exclude-nts
+                          (when exclude-nts exclude-nts)])
+                     (lambda (x)
+                       (and
+                        (or (void? include-nts)
+                            (findf (curry maybe/free-identifier=? (stx-car x)) include-nts))
+                        (or (void? exclude-nts)
+                            (not (findf (curry maybe/free-identifier=? (stx-car x)) exclude-nts))))))
+                   (syntax->list diffed-grammar))))))

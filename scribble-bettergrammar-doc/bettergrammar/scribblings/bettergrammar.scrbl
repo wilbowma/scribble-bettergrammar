@@ -38,11 +38,20 @@ highlighting and annotations to emphasize what has changed between grammars.
 (e (λ (x) e) (e e) x v)
 (v natural ()))
 
+@(define-grammar let-grammar
+#:literals (integer?)
+#:datum-literals (let)
+(e (integer? (let ([x e]) e))))
 
-@defform[(define-grammar id clauses ...)]{
+@defform[(define-grammar maybe-literals maybe-datum-literals id [id clause-datum ...+] ...)
+         #:grammar [(maybe-literals (code:line) (#:literals (id ...)))
+                    (maybe-datum-literals (code:line) (#:datum-literals (id ...)))]
+]{
 Defines @racket[id] as a grammar to be typeset by @racket[typeset-grammar] and
 @racket[typeset-grammar-diff].
-The @racket[clauses ...] are the same as specified by @racket[bettergrammar*].
+The @racket[[id clause-datum] ...], @racket[maybe-literals], and
+@racket[maybe-datum-literals] are the same as specified by second form or
+@racket[bettergrammar*].
 
 Does not render anything by on its own.
 
@@ -51,29 +60,46 @@ Must be used in definition context.
 @examples[
 (require scribble/bettergrammar)
 (define-grammar stlc-grammar (e (λ (x) e) (e e) x))
+(define-grammar let-grammar
+ #:literals (integer?)
+ #:datum-literals (let)
+ (e (integer? (let ([x e]) e))))
 ]
 
 @scribble-example|{
 @bettergrammar*[stlc-grammar]
+@bettergrammar*[let-grammar]
 }|
 
 @scribble-renders[
 @bettergrammar*[stlc-grammar]
+@bettergrammar*[let-grammar]
+]
+
+@history[
+         #:changed "1.4" @elem{Added @racket[#:literals],
+         @racket[#:datum-literals] support}
 ]
 }
 
 @defform*[((bettergrammar* maybe-literals
+                           maybe-datum-literals
                            ([addid clause-datum ...+] ...)
                            ([subid clause-datum ...+] ...)
                            ([id clause-datum ...+] ...))
            (bettergrammar* maybe-literals
+                           maybe-datum-literals
                            [id clause-datum ...+] ...)
-           (bettergrammar* id))]{
+           (bettergrammar* maybe-literals maybe-datum-literals id))
+           #:grammar [(maybe-datum-literals (code:line) (#:datum-literals (id ...)))]]{
 Like @racket[racketgrammar*], but supports typesetting a grammar with difference
 annotations for non-terminals, and typesetting grammars pre-defined using
 @racket[define-grammar].
 @racket[maybe-literals] have the same interpretation as in
 @racket[racketgrammar*].
+
+Identifiers included in @racket[maybe-datum-literals] are not typeset as
+variables, nor as @racket[racket] literals.
 
 The @racket[addid] clauses are typeset as additions to the grammar, using
 @racket[+::=] instead of @racket[::=] to indicate the addition to an existing
@@ -86,9 +112,15 @@ existing nonterminal.
 The @racket[id] clauses are typeset as in @racket[racketgrammar*], but using
 @racket[::=] instead of @racket[=] to define the nonterminal.
 
-The form supports second syntax that is identical to @racket[racketgrammar*],
+The form supports a second syntax that is identical to @racket[racketgrammar*],
 except the nonterminal is still separated from its productions using
-@racket[::=].
+@racket[::=].o
+
+The third syntax enables typesetting a grammar previously defined by
+@racket[define-grammar].
+If the grammar was defined with literals or datum-literals, these are merged
+into any specified directly via @racket[maybe-literals] or
+@racket[maybe-datum-literals].
 
 All forms also support escapes in Scribble using @racket[unsyntax], and various
 Scribble element transformers, such as @racket[code:hilite].
@@ -158,7 +190,12 @@ Scribble element transformers, such as @racket[code:hilite].
 ]
 ]
 
-@history[#:changed "1.2" @elem{Merged functionality from @racket[typeset-grammar-diff] into this form.}]
+@history[#:changed "1.2" @elem{Merged functionality from
+         @racket[typeset-grammar-diff] into this form.}
+
+         #:changed "1.4" @elem{Added @racket[#:literals],
+         @racket[#:datum-literals] support}
+]
 }
 
 @defproc[(bnf:add [datum string?]) string?]{
@@ -254,14 +291,17 @@ Typeset the grammar defined as @racket[id] using @racket[bettergramar*].
   (v (λ (x) e) natural ())
   (natural 0 (add1 natural)))
 
-@defform*[((bettergrammar*-diff maybe-include maybe-exclude old-id new-id)
-(bettergrammar*-diff maybe-include maybe-exclude (old-clauses ...) (new-clauses ...)))
+@defform[(bettergrammar*-diff maybe-literals
+                              maybe-datum-literals
+                              maybe-include
+                              maybe-exclude clause-spec clause-spec)
            #:grammar [(maybe-include (code:line) (#:include (id ...)))
-                      (maybe-exclude (code:line) (#:include (id ...)))]]{
+                      (maybe-exclude (code:line) (#:include (id ...)))
+                      (maybe-literals (code:line) (#:literals (id ...)))
+                      (maybe-datum-literals (code:line) (#:datum-literals (id ...)))
+                      (clause-spec identifier? (clauses ...))]]{
 Compute and typeset the differnce between two grammars.
-In the first form, the two grammars must have been previously defined using
-@racket[define-grammar].
-In the second form, the clauses should match the form of a @racket[racketgrammar*].
+Either @racket[clause-spec] can be a valid @racket[racketgrammar*] spec, or an identifier previously defined by @racket[define-grammar]
 
 If the optional @racket[maybe-include] is given, then only the nonterminals
 specified in @racket[(id ...)] are included in the rendered grammar.
@@ -269,10 +309,25 @@ specified in @racket[(id ...)] are included in the rendered grammar.
 If the optional @racket[maybe-exclude] is given, then any nonterminals
 specified in @racket[(id ...)] are excluded from the rendered grammar.
 
+If the optional @racket[maybe-literals] is given, the literals are passed to
+@racket[bettergrammar*].
+If an identifier from @racket[define-grammar] is used, the literal used in that
+definition will be merged with the @racket[maybe-literals].
+
+If the optional @racket[maybe-datum-literals] is given, the datum literals are
+passed to @racket[bettergrammar*].
+If an identifier from @racket[define-grammar] is used, the datum literal used in
+that definition will be merged with the @racket[maybe-datum-literals].
+
 Renders a new grammar where non-terminals and productions the old grammar
-that have been removed in new grammar are typeset with @racket[bnf:sub], and
+that have been removed in new grammar are typeset like with @racket[bnf:sub], and
 non-terminals and productions that have been added in the new grammar are
-typeset with @racket[bnf:add].
+typeset like with @racket[bnf:add].
+
+The diff algorithm may not preserve source location information used to typeset,
+so large productions may be collapsed to a single line.
+The diff should preserve paren-shape.
+Literals should be linked properly with @racket[racket].
 
 @scribble-example|{
 (define-grammar stlc-grammar-v1
@@ -341,9 +396,31 @@ typeset with @racket[bnf:add].
 ]
 ]
 
+@scribble-example|{
+@bettergrammar*-diff[
+#:literals (integer?)
+#:datum-literals (let)
+((e integer? (let ([x e]) e)))
+((e (let ([x v]) v)
+ (v integer?)))
+]
+}|
+
+@scribble-renders[
+@bettergrammar*-diff[
+#:literals (integer?)
+#:datum-literals (let)
+((e integer? (let ([x e]) e)))
+((e (let ([x v]) v)
+ (v integer?)))
+]
+]
+
 @history[#:changed "1.1" "Support for second, anonymous form."
          #:changed "1.2" @elem{Renamed from @racket[typeset-grammar-diff]}
-         #:changed "1.3" @elem{Added @racket[#:include] and @racket[#:exclude] support.}]
+         #:changed "1.3" @elem{Added @racket[#:include] and @racket[#:exclude] support.}
+         #:changed "1.4" @elem{Added @racket[#:literals], @racket[#:datum-literals] support; enabled mixed-diff between clauses and defined grammars.}
+         ]
 }
 
 @defidform[typeset-grammar-diff]{

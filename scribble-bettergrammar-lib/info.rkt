@@ -3,7 +3,7 @@
 (define deps
   '("base"
     "scribble-lib"
-    "sexp-diff"))
+    ("sexp-diff" #:version "0.2")))
 (define pkg-desc "A Scribble library for typesetting diffs between `racketgrammar` (implementation only, no docs or tests).")
 (define pkg-authors '(wilbowma))
-(define version "1.3")
+(define version "1.4")
