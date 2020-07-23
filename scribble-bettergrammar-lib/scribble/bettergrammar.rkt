@@ -43,33 +43,50 @@
 (define-syntax (bettergrammar* stx)
   (syntax-parse stx
     [(_ #:literals (lit ...)
+        #:datum-literals (dlit ...)
         ([addid addclause ...] ...)
         ([subid subclause ...] ...)
         ([id clause ...] ...))
      (syntax/loc stx
-       (with-racket-variables
-         (lit ...)
-         ([non-term ((id clause ...) ...
-                     (subid subclause ...) ...
-                     (addid addclause ...) ...)])
-         (*racketgrammar
-          (lambda ()
-            (list (list (racket addid)
-                        (racketblock0/form addclause) ...)
-                  ...))
-          (lambda ()
-            (list (list (racket subid)
-                        (racketblock0/form subclause) ...)
-                  ...))
-          (lambda ()
-            (list (list (racket id)
-                        (racketblock0/form clause) ...)
-                  ...)))))]
+       (letrec-syntaxes ([(dlit)
+                          (make-element-id-transformer
+                           (lambda (x)
+                             #`(elem #:style symbol-color (to-element '#,x))))]
+                         ...)
+         (with-racket-variables
+           (lit ... dlit ...)
+           ([non-term ((id clause ...) ...
+                                       (subid subclause ...) ...
+                                       (addid addclause ...) ...)])
+           (*racketgrammar
+            (lambda ()
+              (list (list (racket addid)
+                          (racketblock0/form addclause) ...)
+                    ...))
+            (lambda ()
+              (list (list (racket subid)
+                          (racketblock0/form subclause) ...)
+                    ...))
+            (lambda ()
+              (list (list (racket id)
+                          (racketblock0/form clause) ...)
+                    ...))))))]
+    [(_ #:literals (lit ...)
+        ([addid addclause ...] ...)
+        ([subid subclause ...] ...)
+        ([id clause ...] ...))
+     (syntax/loc stx
+       (bettergrammar* #:literals (lit ...)
+                       #:datum-literals ()
+                       ([addid addclause ...] ...)
+                       ([subid subclause ...] ...)
+                       ([id clause ...] ...)))]
     [(_ ([addid addclause ...] ...)
         ([subid subclause ...] ...)
         ([id clause ...] ...))
      (syntax/loc stx
          (bettergrammar* #:literals ()
+                         #:datum-literals ()
                          ([addid addclause ...] ...)
                          ([subid subclause ...] ...)
                          ([id clause ...] ...)))]
@@ -77,12 +94,31 @@
         [id clause ...] ...)
      (syntax/loc stx
        (bettergrammar* #:literals (lit ...)
+                       #:datum-literals ()
+                       ()
+                       ()
+                       ([id clause ...] ...)))]
+    [(_ #:datum-literals (dlit ...)
+        [id clause ...] ...)
+     (syntax/loc stx
+       (bettergrammar* #:literals ()
+                       #:datum-literals (dlit ...)
+                       ()
+                       ()
+                       ([id clause ...] ...)))]
+    [(_ #:literals (lit ...)
+        #:datum-literals (dlit ...)
+        [id clause ...] ...)
+     (syntax/loc stx
+       (bettergrammar* #:literals (lit ...)
+                       #:datum-literals (dlit ...)
                        ()
                        ()
                        ([id clause ...] ...)))]
     [(_ [id clause ...] ...)
      (syntax/loc stx
        (bettergrammar* #:literals ()
+                       #:datum-literals ()
                        ()
                        ()
                        ([id clause ...] ...)))]
@@ -91,12 +127,11 @@
        (with-syntax ([(did ...) (second v)]
                      [(id ...) (first v)])
          (quasisyntax/loc stx
-           (letrec-syntaxes ([(did)
-                              (make-element-id-transformer
-                               (lambda (x)
-                                 #`(elem #:style keyword-color (to-element '#,x))))]
-                             ...)
-             (bettergrammar* #:literals (did ... id ...) () () #,(third v))))))]))
+           (bettergrammar* #:literals (id ...)
+                           #:datum-literals (did ...)
+                           ()
+                           ()
+                           #,(third v)))))]))
 
 (define (*racketgrammar addclauseses-thunk subclauseses-thunk clauseses-thunk)
   (define (nontermify x)
@@ -249,26 +284,44 @@
                           (include-nt:id ...)))
          (~optional (~seq (~datum #:exclude)
                           (exclude-nt:id ...)))
+         (~optional (~seq (~datum #:literals)
+                          (lid:id ...)))
+         (~optional (~seq (~datum #:datum-literals)
+                          (did:id ...)))
          old-name:id expr)
-      (quasisyntax/loc stx
-        (bettergrammar*-diff (~? (~@ #:include (include-nt ...)))
-                             (~? (~@ #:exclude (exclude-nt ...)))
-                             #,(third (syntax-local-value #'old-name))
-                             expr))]
+      (let ([v (syntax-local-value #'old-name)])
+        (quasisyntax/loc stx
+          (bettergrammar*-diff (~? (~@ #:include (include-nt ...)))
+                               (~? (~@ #:exclude (exclude-nt ...)))
+                               #:literals ((~? (~@ lid ...)) (~@ . #,(first v)))
+                               #:datum-literals ((~? (~@ did ...)) (~@ . #,(second v)))
+                               #,(third v)
+                               expr)))]
      [(_ (~optional (~seq (~datum #:include)
                           (include-nt:id ...)))
          (~optional (~seq (~datum #:exclude)
                           (exclude-nt:id ...)))
+         (~optional (~seq (~datum #:literals)
+                          (lid:id ...)))
+         (~optional (~seq (~datum #:datum-literals)
+                          (did:id ...)))
          clauses1 new-name:id)
-      (quasisyntax/loc stx
-        (bettergrammar*-diff (~? (~@ #:include (include-nt ...)))
-                             (~? (~@ #:exclude (exclude-nt ...)))
-                             clauses1
-                             #,(third (syntax-local-value #'new-name))))]
+      (let ([v (syntax-local-value #'new-name)])
+        (quasisyntax/loc stx
+          (bettergrammar*-diff (~? (~@ #:include (include-nt ...)))
+                               (~? (~@ #:exclude (exclude-nt ...)))
+                               #:literals ((~? (~@ lid ...)) (~@ . #,(first v)))
+                               #:datum-literals ((~? (~@ did ...)) (~@ . #,(second v)))
+                               clauses1
+                               #,(third v))))]
      [(_ (~optional (~seq (~datum #:include)
                           (include-nt:id ...)))
          (~optional (~seq (~datum #:exclude)
                           (exclude-nt:id ...)))
+         (~optional (~seq (~datum #:literals)
+                          (lid:id ...)))
+         (~optional (~seq (~datum #:datum-literals)
+                          (did:id ...)))
          clauses1 clauses2)
       (let-values ([(annotated-grammar fixup-nts)
                     (grammar-diff stx
@@ -278,7 +331,9 @@
                                   (attribute exclude-nt))])
         (with-syntax ([(nts ...) (datum->syntax this-syntax fixup-nts)])
           #`(letrec-syntaxes ([(nts) (make-variable-id 'nts)] ...)
-              (bettergrammar* #,@annotated-grammar))))]))
+              (bettergrammar* (~? (~@ #:literals (lid ...)))
+                              (~? (~@ #:datum-literals (did ...)))
+                              #,@annotated-grammar))))]))
 (begin-for-syntax
   (require sexp-diff)
 
