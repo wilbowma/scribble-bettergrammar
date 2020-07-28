@@ -15,7 +15,8 @@
  racket/format
  (for-syntax
   racket/base
-  syntax/parse)
+  syntax/parse
+  racket/syntax)
  racket/stxparam)
 
 (provide
@@ -36,12 +37,30 @@
     [(_ name (~optional (~seq #:literals (id ...)))
         (~optional (~seq #:datum-literals (did ...)))
         rest ...)
+     #:with typeset-name (format-id #'name "typeset-~a" #'name)
+     #:with (dlit ...) #'(~? (did ...) ())
+     #:with (lit ...) #'(~? (id ...) ())
      (quasisyntax/loc stx
-       (define-syntax name (list #'(~? (id ...) ())
-                                 #'(~? (did ...) ())
-                                 (quote-syntax #,(attribute rest)))))]))
+       (begin
+         (define-syntax name (list #'(lit ...)
+                                   #'(dlit ...)
+                                   (quote-syntax #,(attribute rest))))
+         (define-syntax-rule (typeset-name e)
+           (syntax-parameterize
+               ([current-datum-literals #'(dlit ...)]
+                [current-literals #'(lit ...)])
+             (interpose-on-racketform e)))))]))
 
+;; TODO: Need syntax parameter because with-racket-variables.
 (define-syntax-parameter current-literals #'())
+(define-syntax-parameter current-datum-literals #'())
+
+(define datum-literal-style symbol-color)
+(define-for-syntax datum-literal-transformer
+  (make-element-id-transformer
+   (lambda (x)
+     (quasisyntax/loc x
+       (elem #:style datum-literal-style (to-element '#,x))))))
 
 (define-syntax (bettergrammar* stx)
   (syntax-parse stx
@@ -51,12 +70,9 @@
         ([subid subclause ...] ...)
         ([id clause ...] ...))
      (syntax/loc stx
-       (syntax-parameterize ([current-literals #'(lit ...)])
-         (letrec-syntaxes ([(dlit)
-                            (make-element-id-transformer
-                             (lambda (x)
-                               #`(elem #:style symbol-color (to-element '#,x))))]
-                           ...)
+       (syntax-parameterize ([current-literals #'(lit ...)]
+                             [current-datum-literals #'(dlit ...)])
+         (letrec-syntaxes ([(dlit) datum-literal-transformer] ...)
            (with-racket-variables
              (lit ... dlit ...)
              ([non-term ((id clause ...) ...
@@ -190,23 +206,31 @@
 (define (bnf:sub v)
   (make-element bnf-sub-style (racketvarfont v)))
 
+(define (later style f)
+  (if style (elem #:style style (f)) (f)))
+
+(require (for-syntax syntax/stx))
 ;; TODO: Document and maybe deprecate above interface.
-(define-for-syntax (interpose-on-rackergrammar src style stx)
-  (quasisyntax/loc src
-    (elem #:style #,style
-          (with-racket-variables #,(syntax-parameter-value #'current-literals)
-            ([non-term (#,stx)])
-            (racket/form #,stx)))))
-
-(define-syntax (bnf-add stx)
-  (syntax-parse stx
+(define-syntax (interpose-on-racketform stx)
+  (syntax-case stx ()
     [(_ expr)
-     (interpose-on-rackergrammar stx #'bnf-add-style #'expr)]))
+     (syntax/loc stx (interpose-on-racketform #f expr))]
+    [(_ style expr)
+     (with-syntax ([(dlit ...) (syntax-parameter-value #'current-datum-literals)]
+                   [(lit ...) (syntax-parameter-value #'current-literals)])
+       (quasisyntax/loc stx
+         (letrec-syntaxes ([(dlit) datum-literal-transformer] ...)
+           (with-racket-variables (lit ... dlit ...)
+             ([non-term expr])
+             ;; NOTE: Capturing dlit in the scope of expr
+             ;; Ought I be able to do this with syntax-local-something bla?!
+             (racket/form #,(datum->syntax #'(dlit ...) (syntax->datum #'expr)))))))]))
 
-(define-syntax (bnf-sub stx)
-  (syntax-parse stx
-    [(_ expr)
-     (interpose-on-rackergrammar stx #'bnf-sub-style #'expr)]))
+(define-syntax-rule (bnf-add expr)
+  (interpose-on-racketform bnf-add-style expr))
+
+(define-syntax-rule (bnf-sub expr)
+  (interpose-on-racketform bnf-sub-style expr))
 
 ;; Need to extend this with code:hilite
 (require
