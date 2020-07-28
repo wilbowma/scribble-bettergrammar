@@ -15,8 +15,7 @@
  (for-syntax
   racket/base
   syntax/parse
-  racket/syntax)
- racket/stxparam)
+  racket/syntax))
 
 (provide
  bettergrammar*
@@ -49,14 +48,7 @@
            (grammar #'(lit ...) #'(dlit ...) (quote-syntax #,(attribute rest))
                     (syntax-rules ()
                       [(_ e)
-                       (syntax-parameterize
-                           ([current-datum-literals #'(dlit ...)]
-                            [current-literals #'(lit ...)])
-                         (interpose-on-racketform e))])))))]))
-
-;; TODO: Need syntax parameter because with-racket-variables.
-(define-syntax-parameter current-literals #'())
-(define-syntax-parameter current-datum-literals #'())
+                       (interpose-on-racketform #f #,(attribute lit) #,(attribute dlit) e)])))))]))
 
 (define datum-literal-style symbol-color)
 (define-for-syntax datum-literal-transformer
@@ -73,27 +65,25 @@
         ([subid subclause ...] ...)
         ([id clause ...] ...))
      (syntax/loc stx
-       (syntax-parameterize ([current-literals #'(lit ...)]
-                             [current-datum-literals #'(dlit ...)])
-         (letrec-syntaxes ([(dlit) datum-literal-transformer] ...)
-           (with-racket-variables
-             (lit ... dlit ...)
-             ([non-term ((id clause ...) ...
-                                         (subid subclause ...) ...
-                                         (addid addclause ...) ...)])
-             (*racketgrammar
-              (lambda ()
-                (list (list (racket addid)
-                            (racketblock0/form addclause) ...)
-                      ...))
-              (lambda ()
-                (list (list (racket subid)
-                            (racketblock0/form subclause) ...)
-                      ...))
-              (lambda ()
-                (list (list (racket id)
-                            (racketblock0/form clause) ...)
-                      ...)))))))]
+       (letrec-syntaxes ([(dlit) datum-literal-transformer] ...)
+         (with-racket-variables
+           (lit ... dlit ...)
+           ([non-term ((id clause ...) ...
+                                       (subid subclause ...) ...
+                                       (addid addclause ...) ...)])
+           (*racketgrammar
+            (lambda ()
+              (list (list (racket addid)
+                          (racketblock0/form addclause) ...)
+                    ...))
+            (lambda ()
+              (list (list (racket subid)
+                          (racketblock0/form subclause) ...)
+                    ...))
+            (lambda ()
+              (list (list (racket id)
+                          (racketblock0/form clause) ...)
+                    ...))))))]
     [(_ #:literals (lit ...)
         ([addid addclause ...] ...)
         ([subid subclause ...] ...)
@@ -209,31 +199,27 @@
 (define (bnf:sub v)
   (make-element bnf-sub-style (racketvarfont v)))
 
-(define (later style f)
-  (if style (elem #:style style (f)) (f)))
+(define (wrap style expr)
+  (if style (elem #:style style expr) expr))
 
-(require (for-syntax syntax/stx))
+
+(require (for-syntax racket/syntax racket/function racket/set))
 ;; TODO: Document and maybe deprecate above interface.
 (define-syntax (interpose-on-racketform stx)
   (syntax-case stx ()
-    [(_ expr)
-     (syntax/loc stx (interpose-on-racketform #f expr))]
-    [(_ style expr)
-     (with-syntax ([(dlit ...) (syntax-parameter-value #'current-datum-literals)]
-                   [(lit ...) (syntax-parameter-value #'current-literals)])
+    [(_ style (lit ...) (dlit ...) expr)
+     (with-syntax ([(did ...) (map (curry format-id #'expr "~a") (syntax->list #'(dlit ...)))])
        (quasisyntax/loc stx
-         (letrec-syntaxes ([(dlit) datum-literal-transformer] ...)
-           (with-racket-variables (lit ... dlit ...)
-             ([non-term expr])
-             ;; NOTE: Capturing dlit in the scope of expr
-             ;; Ought I be able to do this with syntax-local-something bla?!
-             (racket/form #,(datum->syntax #'(dlit ...) (syntax->datum #'expr)))))))]))
+         (with-racket-variables (lit ...)
+           ([non-term expr])
+           (let-syntax ([did datum-literal-transformer] ...)
+             (wrap style (racket/form expr))))))]))
 
-(define-syntax-rule (bnf-add expr)
-  (interpose-on-racketform bnf-add-style expr))
+(define-syntax-rule (bnf-add lit dlit expr)
+  (interpose-on-racketform bnf-add-style lit dlit expr))
 
-(define-syntax-rule (bnf-sub expr)
-  (interpose-on-racketform bnf-sub-style expr))
+(define-syntax-rule (bnf-sub lit dlit expr)
+  (interpose-on-racketform bnf-sub-style lit dlit expr))
 
 ;; Need to extend this with code:hilite
 (require
@@ -365,14 +351,18 @@
          (~optional (~seq (~datum #:datum-literals)
                           (did:id ...)))
          clauses1 clauses2)
+      #:with (lit ...) #'(~? (lid ...) ())
+      #:with (dlit ...) #'(~? (did ...) ())
       (let-values ([(annotated-grammar)
                     (grammar-diff stx
                                   #'clauses1
                                   #'clauses2
                                   (attribute include-nt)
-                                  (attribute exclude-nt))])
-        #`(bettergrammar* (~? (~@ #:literals (lid ...)))
-                          (~? (~@ #:datum-literals (did ...)))
+                                  (attribute exclude-nt)
+                                  (attribute lit)
+                                  (attribute dlit))])
+        #`(bettergrammar* #:literals (lit ...)
+                          #:datum-literals (dlit ...)
                           #,@annotated-grammar))]))
 (begin-for-syntax
   (require sexp-diff/stx-diff racket/function syntax/stx)
@@ -393,14 +383,14 @@
                    old)
         old))
 
-  (define (grammar-diff stx old-g-stxs new-g-stxs include-nts exclude-nts)
+  (define (grammar-diff stx old-g-stxs new-g-stxs include-nts exclude-nts lit dlit)
     (let ([diffed-grammar (stx-car (stx-diff old-g-stxs new-g-stxs
                                              #:old-marker (lambda (x)
                                                             (quasisyntax/loc x
-                                                              ((#,#'unsyntax (bnf-sub #,x)))))
+                                                              ((#,#'unsyntax (bnf-sub #,lit #,dlit #,x)))))
                                              #:new-marker (lambda (x)
                                                             (quasisyntax/loc x
-                                                              ((#,#'unsyntax (bnf-add #,x)))))))]
+                                                              ((#,#'unsyntax (bnf-add #,lit #,dlit #,x)))))))]
           [fixup-nts (box '())])
       (map (compose
             ;; Regularize the srclocs of each production. This disrupts the
@@ -415,9 +405,9 @@
             ;; in the wrong spot for typesetting.
             (lambda (x)
               (syntax-parse x
-                [((~and us (~literal unsyntax)) (annotator (nt prods ...)))
+                [((~and us (~literal unsyntax)) (annotator lit dlit (nt prods ...)))
                  (quasisyntax/loc x
-                   ((us (annotator nt))
+                   ((us (annotator lit dlit nt))
                     prods ...))]
                 [_ x])))
            (filter (let ([include-nts
