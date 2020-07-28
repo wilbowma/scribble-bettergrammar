@@ -202,8 +202,16 @@
 (define (wrap style expr)
   (if style (elem #:style style expr) expr))
 
+(define-syntax let*-syntax
+  (syntax-rules ()
+    [(_ () body)
+     body]
+    [(_ ([id expr]) body)
+     (let-syntax ([id expr]) body)]
+    [(_ ([id expr] rest ...) body)
+     (let-syntax ([id expr]) (let*-syntax (rest ...) body))]))
 
-(require (for-syntax racket/syntax racket/function racket/set))
+(require (for-syntax racket/syntax racket/function))
 ;; TODO: Document and maybe deprecate above interface.
 (define-syntax (interpose-on-racketform stx)
   (syntax-case stx ()
@@ -212,7 +220,7 @@
        (quasisyntax/loc stx
          (with-racket-variables (lit ...)
            ([non-term expr])
-           (let-syntax ([did datum-literal-transformer] ...)
+           (let*-syntax ([did datum-literal-transformer] ...)
              (wrap style (racket/form expr))))))]))
 
 (define-syntax-rule (bnf-add lit dlit expr)
