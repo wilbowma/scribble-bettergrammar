@@ -3,7 +3,6 @@
 (require
  racket/runtime-path
  racket/list
- (for-syntax racket/list)
  scribble/base
  scribble/struct
  scribble/racket
@@ -32,6 +31,10 @@
 
 (define-runtime-path css-path "bettergrammar.css")
 
+(begin-for-syntax
+  (struct grammar (literals datum-literals clauses typesetter)
+    #:property prop:procedure (struct-field-index typesetter)))
+
 (define-syntax (define-grammar stx)
   (syntax-parse stx
     [(_ name (~optional (~seq #:literals (id ...)))
@@ -42,14 +45,14 @@
      #:with (lit ...) #'(~? (id ...) ())
      (quasisyntax/loc stx
        (begin
-         (define-syntax name (list #'(lit ...)
-                                   #'(dlit ...)
-                                   (quote-syntax #,(attribute rest))))
-         (define-syntax-rule (typeset-name e)
-           (syntax-parameterize
-               ([current-datum-literals #'(dlit ...)]
-                [current-literals #'(lit ...)])
-             (interpose-on-racketform e)))))]))
+         (define-syntax name
+           (grammar #'(lit ...) #'(dlit ...) (quote-syntax #,(attribute rest))
+                    (syntax-rules ()
+                      [(_ e)
+                       (syntax-parameterize
+                           ([current-datum-literals #'(dlit ...)]
+                            [current-literals #'(lit ...)])
+                         (interpose-on-racketform e))])))))]))
 
 ;; TODO: Need syntax parameter because with-racket-variables.
 (define-syntax-parameter current-literals #'())
@@ -144,14 +147,14 @@
                        ([id clause ...] ...)))]
     [(_ id)
      (let ([v (syntax-local-value #'id)])
-       (with-syntax ([(did ...) (second v)]
-                     [(id ...) (first v)])
+       (with-syntax ([(did ...) (grammar-datum-literals v)]
+                     [(id ...) (grammar-literals v)])
          (quasisyntax/loc stx
            (bettergrammar* #:literals (id ...)
                            #:datum-literals (did ...)
                            ()
                            ()
-                           #,(third v)))))]))
+                           #,(grammar-clauses v)))))]))
 
 (define (*racketgrammar addclauseses-thunk subclauseses-thunk clauseses-thunk)
   (define (nontermify x)
@@ -332,9 +335,9 @@
         (quasisyntax/loc stx
           (bettergrammar*-diff (~? (~@ #:include (include-nt ...)))
                                (~? (~@ #:exclude (exclude-nt ...)))
-                               #:literals ((~? (~@ lid ...)) (~@ . #,(first v)))
-                               #:datum-literals ((~? (~@ did ...)) (~@ . #,(second v)))
-                               #,(third v)
+                               #:literals ((~? (~@ lid ...)) (~@ . #,(grammar-literals v)))
+                               #:datum-literals ((~? (~@ did ...)) (~@ . #,(grammar-datum-literals v)))
+                               #,(grammar-clauses v)
                                expr)))]
      [(_ (~optional (~seq (~datum #:include)
                           (include-nt:id ...)))
@@ -349,10 +352,10 @@
         (quasisyntax/loc stx
           (bettergrammar*-diff (~? (~@ #:include (include-nt ...)))
                                (~? (~@ #:exclude (exclude-nt ...)))
-                               #:literals ((~? (~@ lid ...)) (~@ . #,(first v)))
-                               #:datum-literals ((~? (~@ did ...)) (~@ . #,(second v)))
+                               #:literals ((~? (~@ lid ...)) (~@ . #,(grammar-literals v)))
+                               #:datum-literals ((~? (~@ did ...)) (~@ . #,(grammar-datum-literals v)))
                                clauses1
-                               #,(third v))))]
+                               #,(grammar-clauses v))))]
      [(_ (~optional (~seq (~datum #:include)
                           (include-nt:id ...)))
          (~optional (~seq (~datum #:exclude)
