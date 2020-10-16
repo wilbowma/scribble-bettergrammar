@@ -31,6 +31,7 @@
 (define-runtime-path css-path "bettergrammar.css")
 
 (begin-for-syntax
+  (provide (struct-out grammar))
   (struct grammar (literals datum-literals clauses typesetter)
     #:property prop:procedure (struct-field-index typesetter)))
 
