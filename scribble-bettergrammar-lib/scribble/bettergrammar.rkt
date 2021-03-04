@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require
+ racket/stream
  racket/runtime-path
  racket/list
  scribble/base
@@ -383,12 +384,15 @@
 
 (define-syntax (bettergrammar*-ndiff stx)
   (syntax-parse stx
-    [(_ (spec ... lang)
-        (specs ... langs)
-        ...)
+    [(_
+      (~optional (~seq #:labels (strs ...)))
+      (spec ... lang)
+      (specs ... langs) ...)
      #`(tabbed-view
+        (~? (list strs ...) '())
         (bettergrammar*-diff spec ... lang lang)
-        (bettergrammar*-diff specs ... lang langs) ...)]))
+        (bettergrammar*-diff specs ... lang langs)
+        ...)]))
 
 (define tab-frame-style
   (make-style "tab-frame" (list 'never-indents (alt-tag "div"))))
@@ -402,7 +406,7 @@
 (require (only-in xml cdata))
 (define do-fixup (xexpr-property (cdata #f #f "") (cdata #f #f "<script type=text/javascript>fixup_bettergrammar();</script>")))
 
-(define (tabbed-view . grammars)
+(define (tabbed-view maybe-strs . grammars)
   (compound-paragraph
    (make-style #f '())
    (list
@@ -414,6 +418,8 @@
        (apply
         append
         (for/list ([_ grammars]
+                   ;; maybe-strs followed by an infinite stream of #f
+                   [str (letrec ([x (stream-append maybe-strs (stream-cons #f x))]) x)]
                    [n (in-naturals 1)])
           (list
            (elem #:style (make-style #f (list
@@ -425,7 +431,7 @@
                                             ,@(if (= n 1)
                                                   `((checked . "checked"))
                                                   '()))))))
-           (elem (format "View ~a" n)
+           (elem (or str (format "View ~a" n))
                  #:style (make-style #f (list
                                          (alt-tag "label")
                                          (make-attributes `((for . ,(format "tab~a"
