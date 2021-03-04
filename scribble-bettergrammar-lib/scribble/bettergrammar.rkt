@@ -327,6 +327,7 @@
                           (lid:id ...)))
          (~optional (~seq (~datum #:datum-literals)
                           (did:id ...)))
+         (~optional (~and #:reverse (~bind (rflag #t))))
          old-name:id expr)
       (let ([v (syntax-local-value #'old-name)])
         (quasisyntax/loc stx
@@ -334,6 +335,7 @@
                                (~? (~@ #:exclude (exclude-nt ...)))
                                #:literals ((~? (~@ lid ...)) (~@ . #,(grammar-literals v)))
                                #:datum-literals ((~? (~@ did ...)) (~@ . #,(grammar-datum-literals v)))
+                               #,@(if (attribute rflag) (list #'#:reverse) '())
                                #,(grammar-clauses v)
                                expr)))]
      [(_ (~optional (~seq (~datum #:include)
@@ -344,6 +346,7 @@
                           (lid:id ...)))
          (~optional (~seq (~datum #:datum-literals)
                           (did:id ...)))
+         (~optional (~and #:reverse (~bind (rflag #t))))
          clauses1 new-name:id)
       (let ([v (syntax-local-value #'new-name)])
         (quasisyntax/loc stx
@@ -351,6 +354,7 @@
                                (~? (~@ #:exclude (exclude-nt ...)))
                                #:literals ((~? (~@ lid ...)) (~@ . #,(grammar-literals v)))
                                #:datum-literals ((~? (~@ did ...)) (~@ . #,(grammar-datum-literals v)))
+                               #,@(if (attribute rflag) (list #'#:reverse) '())
                                clauses1
                                #,(grammar-clauses v))))]
      [(_ (~optional (~seq (~datum #:include)
@@ -361,13 +365,14 @@
                           (lid:id ...)))
          (~optional (~seq (~datum #:datum-literals)
                           (did:id ...)))
+         (~optional (~and #:reverse (~bind (rflag #t))))
          clauses1 clauses2)
       #:with (lit ...) #'(~? (lid ...) ())
       #:with (dlit ...) #'(~? (did ...) ())
       (let-values ([(annotated-grammar)
                     (grammar-diff stx
-                                  #'clauses1
-                                  #'clauses2
+                                  (if (attribute rflag) #'clauses2 #'clauses1)
+                                  (if (attribute rflag) #'clauses1 #'clauses2)
                                   (attribute include-nt)
                                   (attribute exclude-nt)
                                   (attribute lit)
