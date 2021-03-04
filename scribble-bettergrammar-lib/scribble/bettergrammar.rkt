@@ -378,12 +378,12 @@
 
 (define-syntax (bettergrammar*-ndiff stx)
   (syntax-parse stx
-    [(_ lang
-        (spec ... lang2)
+    [(_ (spec ... lang)
+        (specs ... langs)
         ...)
      #`(tabbed-view
-        (bettergrammar* lang)
-        (bettergrammar*-diff spec ... lang lang2) ...)]))
+        (bettergrammar*-diff spec ... lang lang)
+        (bettergrammar*-diff specs ... lang langs) ...)]))
 
 (define tab-frame-style
   (make-style "tab-frame" (list 'never-indents (alt-tag "div"))))
