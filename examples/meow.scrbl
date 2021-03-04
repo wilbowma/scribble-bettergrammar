@@ -47,7 +47,9 @@
 @; Above I've defined some grammars that I want to view the diffs between.
 @; Maybe I want to include and exclude certain non-terminals
 @bettergrammar*-ndiff[
+#:labels ("Int+Bool-Lang" "vs Int-Lang" "vs ANF-Lang" "(r) vs ANF-lang")
 (#:exclude (binop integer x) int+bool-lang)
 (int-lang)
 (#:include (value triv) anf-lang)
+(#:include (value triv) #:reverse anf-lang)
 ]
