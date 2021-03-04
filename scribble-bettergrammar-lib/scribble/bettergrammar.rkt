@@ -4,9 +4,9 @@
  racket/runtime-path
  racket/list
  scribble/base
- scribble/struct
+ (only-in scribble/struct make-flow make-table)
  scribble/racket
- (only-in scribble/core make-style)
+ (except-in scribble/core make-table)
  scribble/html-properties
  (except-in scribble/manual racketgrammar*)
  (except-in scribble/private/manual-vars with-racket-variables)
@@ -26,9 +26,11 @@
  bnf-sub
  define-grammar
  bettergrammar*-diff
- (rename-out [bettergrammar*-diff typeset-grammar-diff]))
+ (rename-out [bettergrammar*-diff typeset-grammar-diff])
+ bettergrammar*-ndiff)
 
 (define-runtime-path css-path "bettergrammar.css")
+(define-runtime-path js-path "bettergrammar-fixup.js")
 
 (begin-for-syntax
   (provide (struct-out grammar))
@@ -373,6 +375,66 @@
         #`(bettergrammar* #:literals (lit ...)
                           #:datum-literals (dlit ...)
                           #,@annotated-grammar))]))
+
+(define-syntax (bettergrammar*-ndiff stx)
+  (syntax-parse stx
+    [(_ lang
+        (spec ... lang2)
+        ...)
+     #`(tabbed-view
+        (bettergrammar* lang)
+        (bettergrammar*-diff spec ... lang lang2) ...)]))
+
+(define tab-frame-style
+  (make-style "tab-frame" (list 'never-indents (alt-tag "div"))))
+
+(define (tab-style props)
+  (make-style "tab" (append (list 'never-indents (alt-tag "div"))
+                            props)))
+
+(define fixup-style (make-style "delete-me" (list 'never-indents 'div (js-addition js-path))))
+
+(require (only-in xml cdata))
+(define do-fixup (xexpr-property (cdata #f #f "") (cdata #f #f "<script type=text/javascript>fixup_bettergrammar();</script>")))
+
+(define (tabbed-view . grammars)
+  (compound-paragraph
+   (make-style #f '())
+   (list
+    (nested-flow
+     tab-frame-style
+     (cons
+      (paragraph
+       fixup-style
+       (apply
+        append
+        (for/list ([_ grammars]
+                   [n (in-naturals 1)])
+          (list
+           (elem #:style (make-style #f (list
+                                         (alt-tag "input")
+                                         (make-attributes
+                                          `((type . "radio")
+                                            (name . "tab")
+                                            (id . ,(format "tab~a" n))
+                                            ,@(if (= n 1)
+                                                  `((checked . "checked"))
+                                                  '()))))))
+           (elem (format "View ~a" n)
+                 #:style (make-style #f (list
+                                         (alt-tag "label")
+                                         (make-attributes `((for . ,(format "tab~a"
+                                                                            n)))))))))))
+      (for/list ([g grammars])
+        ;; Grammars are tables with a #f style name
+        #;(tab-style (style-properties (table-style g)))
+        #;(with-output-to-file "log" (thunk (displayln (style-properties (table-style g)))))
+        (table (tab-style (style-properties (table-style g)))
+               (table-blockss g)))))
+    (paragraph
+     (make-style #f '())
+     (element (style #f (list do-fixup)) "")))))
+
 (begin-for-syntax
   (require sexp-diff/stx-diff racket/function syntax/stx)
 
