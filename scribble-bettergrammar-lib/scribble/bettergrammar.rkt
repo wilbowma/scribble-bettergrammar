@@ -412,6 +412,12 @@
       (set-box! x (add1 (unbox x)))
       (unbox x))))
 
+(define fresh-tab-group-id
+  (let ([x (box 0)])
+    (lambda ()
+      (set-box! x (add1 (unbox x)))
+      (unbox x))))
+
 (define (tabbed-view maybe-strs . grammars)
   (compound-paragraph
    (make-style #f '())
@@ -423,28 +429,28 @@
        fixup-style
        (apply
         append
-        (for/list ([_ grammars]
-                   ;; maybe-strs followed by an infinite stream of #f
-                   [str (letrec ([x (stream-append maybe-strs (stream-cons #f
-                                                                           x))])
-                          x)]
-                   [n (in-naturals 1)])
-          (let ([id (fresh-tab-id)])
-            (list
-             (elem #:style (make-style #f (list
-                                           (alt-tag "input")
-                                           (make-attributes
-                                            `((type . "radio")
-                                              (name . "tab")
-                                              (id . ,(format "tab~a" id))
-                                              ,@(if (= n 1)
-                                                    `((checked . "checked"))
-                                                    '()))))))
-             (elem (or str (format "View ~a" n))
-                   #:style (make-style #f (list
-                                           (alt-tag "label")
-                                           (make-attributes `((for . ,(format "tab~a"
-                                                                              id))))))))))))
+        (let ([tg-id (fresh-tab-group-id)])
+          (for/list ([_ grammars]
+                     ;; maybe-strs followed by an infinite stream of #f
+                     [str (letrec ([x (stream-append maybe-strs (stream-cons #f
+                                                                             x))])
+                            x)]
+                     [n (in-naturals 1)])
+            (let ([id (fresh-tab-id)])
+              (list
+               (elem #:style (make-style #f (list
+                                             (alt-tag "input")
+                                             (make-attributes
+                                              `((type . "radio")
+                                                (name . ,(format "tab-group~a" tg-id))
+                                                (id . ,(format "tab~a" id))
+                                                ,@(if (= n 1)
+                                                      `((checked . "checked"))
+                                                      '()))))))
+               (elem (or str (format "View ~a" n))
+                     #:style (make-style #f (list
+                                             (alt-tag "label")
+                                             (make-attributes `((for . ,(format "tab~a" id)))))))))))))
       (for/list ([g grammars])
         ;; Grammars are tables with a #f style name
         #;(tab-style (style-properties (table-style g)))
