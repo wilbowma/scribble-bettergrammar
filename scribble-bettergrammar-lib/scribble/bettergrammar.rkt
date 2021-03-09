@@ -429,7 +429,7 @@
                                                                            x))])
                           x)]
                    [n (in-naturals 1)])
-          (let ([is (fresh-tab-id)])
+          (let ([id (fresh-tab-id)])
             (list
              (elem #:style (make-style #f (list
                                            (alt-tag "input")
