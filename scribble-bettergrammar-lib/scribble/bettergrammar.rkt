@@ -406,6 +406,12 @@
 (require (only-in xml cdata))
 (define do-fixup (xexpr-property (cdata #f #f "") (cdata #f #f "<script type=text/javascript>fixup_bettergrammar();</script>")))
 
+(define fresh-tab-id
+  (let ([x (box 0)])
+    (lambda ()
+      (set-box! x (add1 (unbox x)))
+      (unbox x))))
+
 (define (tabbed-view maybe-strs . grammars)
   (compound-paragraph
    (make-style #f '())
@@ -419,23 +425,23 @@
         append
         (for/list ([_ grammars]
                    ;; maybe-strs followed by an infinite stream of #f
-                   [str (letrec ([x (stream-append maybe-strs (stream-cons #f x))]) x)]
-                   [n (in-naturals 1)])
-          (list
-           (elem #:style (make-style #f (list
-                                         (alt-tag "input")
-                                         (make-attributes
-                                          `((type . "radio")
-                                            (name . "tab")
-                                            (id . ,(format "tab~a" n))
-                                            ,@(if (= n 1)
-                                                  `((checked . "checked"))
-                                                  '()))))))
-           (elem (or str (format "View ~a" n))
-                 #:style (make-style #f (list
-                                         (alt-tag "label")
-                                         (make-attributes `((for . ,(format "tab~a"
-                                                                            n)))))))))))
+                   [str (letrec ([x (stream-append maybe-strs (stream-cons #f x))]) x)])
+          (let ([n (fresh-tab-id)])
+            (list
+             (elem #:style (make-style #f (list
+                                           (alt-tag "input")
+                                           (make-attributes
+                                            `((type . "radio")
+                                              (name . "tab")
+                                              (id . ,(format "tab~a" n))
+                                              ,@(if (= n 1)
+                                                    `((checked . "checked"))
+                                                    '()))))))
+             (elem (or str (format "View ~a" n))
+                   #:style (make-style #f (list
+                                           (alt-tag "label")
+                                           (make-attributes `((for . ,(format "tab~a"
+                                                                              n))))))))))))
       (for/list ([g grammars])
         ;; Grammars are tables with a #f style name
         #;(tab-style (style-properties (table-style g)))
