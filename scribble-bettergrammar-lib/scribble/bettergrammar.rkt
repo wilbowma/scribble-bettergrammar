@@ -425,15 +425,18 @@
         append
         (for/list ([_ grammars]
                    ;; maybe-strs followed by an infinite stream of #f
-                   [str (letrec ([x (stream-append maybe-strs (stream-cons #f x))]) x)])
-          (let ([n (fresh-tab-id)])
+                   [str (letrec ([x (stream-append maybe-strs (stream-cons #f
+                                                                           x))])
+                          x)]
+                   [n (in-naturals 1)])
+          (let ([is (fresh-tab-id)])
             (list
              (elem #:style (make-style #f (list
                                            (alt-tag "input")
                                            (make-attributes
                                             `((type . "radio")
                                               (name . "tab")
-                                              (id . ,(format "tab~a" n))
+                                              (id . ,(format "tab~a" id))
                                               ,@(if (= n 1)
                                                     `((checked . "checked"))
                                                     '()))))))
@@ -441,7 +444,7 @@
                    #:style (make-style #f (list
                                            (alt-tag "label")
                                            (make-attributes `((for . ,(format "tab~a"
-                                                                              n))))))))))))
+                                                                              id))))))))))))
       (for/list ([g grammars])
         ;; Grammars are tables with a #f style name
         #;(tab-style (style-properties (table-style g)))
