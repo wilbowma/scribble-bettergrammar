@@ -49,7 +49,7 @@
 @bettergrammar*-ndiff[
 #:labels ("Int+Bool-Lang" "vs Int-Lang" "vs ANF-Lang" "(r) vs ANF-lang")
 (#:exclude (binop integer x) int+bool-lang)
-(int-lang)
-(#:include (value triv) anf-lang)
-(#:include (value triv) #:reverse anf-lang)
+(int+bool-lang int-lang)
+(#:include (value triv) int+bool-lang anf-lang)
+(#:include (value triv) #:reverse int+bool-lang anf-lang)
 ]

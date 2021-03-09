@@ -382,16 +382,30 @@
                           #:datum-literals (dlit ...)
                           #,@annotated-grammar))]))
 
+;; TODO: reduce duplication above using grammar spec
+;; TODO: Order independent?
+(begin-for-syntax
+  (define-splicing-syntax-class grammar-spec
+    (pattern
+     (~seq
+      (~optional (~seq #:include
+                              (include-nt:id ...)))
+      (~optional (~seq #:exclude
+                              (exclude-nt:id ...)))
+      (~optional (~seq #:literals
+                              (lid:id ...)))
+      (~optional (~seq #:datum-literals
+                              (did:id ...)))
+      (~optional (~and #:reverse (~bind (rflag #t))))))))
+
 (define-syntax (bettergrammar*-ndiff stx)
   (syntax-parse stx
     [(_
       (~optional (~seq #:labels (strs ...)))
-      (spec ... lang)
-      (specs ... langs) ...)
+      (specs:grammar-spec (~optional slangs) tlangs) ...)
      #`(tabbed-view
         (~? (list strs ...) '())
-        (bettergrammar*-diff spec ... lang lang)
-        (bettergrammar*-diff specs ... lang langs)
+        (bettergrammar*-diff (~@ . specs) (~? slangs tlangs) tlangs)
         ...)]))
 
 (define tab-frame-style
