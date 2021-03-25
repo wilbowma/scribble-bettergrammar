@@ -476,7 +476,7 @@
      (element (style #f (list do-fixup)) "")))))
 
 (begin-for-syntax
-  (require sexp-diff racket/function syntax/stx)
+  (require sexp-diff/stx-diff racket/function syntax/stx)
 
   (define (maybe/free-identifier=? id1 id2)
     (and (identifier? id1) (identifier? id2) (free-identifier=? id1 id2)))
@@ -495,18 +495,10 @@
         old))
 
   (define (grammar-diff stx old-g-stxs new-g-stxs include-nts exclude-nts lit dlit)
-    (define (changed-nt? y)
-      (member (syntax->datum y) (car (sexp-diff (map car (syntax->datum old-g-stxs))
-                                (map car (syntax->datum new-g-stxs))))))
-
     (let ([diffed-grammar (stx-car (stx-diff old-g-stxs new-g-stxs
                                              #:old-marker (lambda (x)
-                                                            #;(quasisyntax/loc x
-                                                              ((#,#'unsyntax
-                                                                (bnf-sub #,lit #,dlit #,x))))
-                                                            (if (changed-nt? x)
-                                                                #'()
-                                                                (quasisyntax/loc x ((#,#'unsyntax (bnf-sub #,lit #,dlit #,x))))))
+                                                            (quasisyntax/loc x
+                                                              ((#,#'unsyntax (bnf-sub #,lit #,dlit #,x)))))
                                              #:new-marker (lambda (x)
                                                             (quasisyntax/loc x
                                                               ((#,#'unsyntax (bnf-add #,lit #,dlit #,x)))))))]
@@ -520,10 +512,10 @@
                 [(nt prods ...)
                  (quasisyntax/loc this-syntax
                    (#,(erase-srcloc (attribute nt)) #,@(map erase-srcloc (attribute prods))))]))
+            ;; Fix up when nt is deleted. The diff algorithm puts the annotation
+            ;; in the wrong spot for typesetting.
             (lambda (x)
               (syntax-parse x
-                ;; Fix up when nt is deleted. The diff algorithm puts the annotation
-                ;; in the wrong spot for typesetting.
                 [((~and us (~literal unsyntax)) (annotator lit dlit (nt prods ...)))
                  (quasisyntax/loc x
                    ((us (annotator lit dlit nt))
