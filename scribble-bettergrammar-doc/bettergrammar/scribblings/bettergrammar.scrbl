@@ -423,6 +423,93 @@ Literals should be linked properly with @racket[racket].
          ]
 }
 
+@defform[(bettergrammar*-ndiff
+          maybe-labels
+          (maybe-include maybe-exclude maybe-clause-spec clause-spec) ...)
+          #:grammar [(maybe-labels (code:line) (#:labels (string-literal ...)))
+                     (maybe-include (code:line) (#:include (id ...)))
+                     (maybe-exclude (code:line) (#:include (id ...)))
+                     (maybe-literals (code:line) (#:literals (id ...)))
+                     (maybe-datum-literals (code:line) (#:datum-literals (id ...)))
+                     (clause-spec identifier? (clauses ...))
+                     (maybe-clause-spec (code:line) clause-spec)]]{
+
+Compute and typeset a sequence of differences.
+The intention is for this to only be supported on the HTML backend, to support
+an interactive view comparing different grammars.
+
+The main input is a sequence of clause specifications that are valid for
+@racket[bettergrammar*-diff].
+Each clause specification takes the same optional include and exclude arguments,
+can be a clause specification directly or a defined grammar.
+The first clause spec is optional; if excluded, then no difference is computed,
+and the required clause spec is typeset normally.
+
+If labels are provided, then there must be one label for each pair of difference
+specification.
+The labels are used in the tabbed interface.
+
+@scribble-example|{
+@bettergrammar*-ndiff[
+(stlc-grammar-v1)
+]
+}|
+
+@scribble-renders[
+@bettergrammar*-ndiff[
+(stlc-grammar-v1)
+]
+]
+
+@scribble-example|{
+@bettergrammar*-ndiff[
+(stlc-grammar-v1 stlc-grammar-v2)
+]
+}|
+
+@scribble-renders[
+@bettergrammar*-ndiff[
+(stlc-grammar-v1 stlc-grammar-v2)
+]
+]
+
+@scribble-example|{
+@bettergrammar*-ndiff[
+#:labels ("Diff" "stlc-grammar-v2")
+(stlc-grammar-v1 stlc-grammar-v2)
+(stlc-grammar-v2)
+]
+}|
+
+@scribble-renders[
+@bettergrammar*-ndiff[
+#:labels ("Diff" "stlc-grammar-v2")
+(stlc-grammar-v1 stlc-grammar-v2)
+(stlc-grammar-v2)
+]
+]
+
+@scribble-example|{
+@bettergrammar*-ndiff[
+#:labels ("Diff" "stlc-grammar-v2")
+(#:include (e v) stlc-grammar-v1 stlc-grammar-v2)
+(stlc-grammar-v2)
+]
+}|
+
+
+@scribble-renders[
+@bettergrammar*-ndiff[
+#:labels ("Diff" "stlc-grammar-v2")
+(#:include (e v) stlc-grammar-v1 stlc-grammar-v2)
+(stlc-grammar-v2)
+]
+]
+
+@history[#:added "1.5"]
+}
+
+
 @defidform[typeset-grammar-diff]{
 An alias for @racket[bettergrammar*-diff] for backwards compatibility.
 
