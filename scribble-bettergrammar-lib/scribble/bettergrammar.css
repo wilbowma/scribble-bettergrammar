@@ -23,22 +23,33 @@
 div.tab-frame input{
     display:none;
 }
+
 div.tab-frame label{
     display:block;
     float:left;
     padding:5px 10px;
-    cursor:pointer
+    cursor:pointer;
+    color: #07A;
+    background: rgba(80, 80, 80, .1);
+}
+
+div.tab-frame label:hover {
+    color: #07A;
+    text-decoration-line: underline;
 }
 
 div.tab-frame input:checked + label{
-    background:#ddddff;
-    cursor:default
+    cursor:default;
+    box-shadow: 0px -1px 2px gray;
+    background: unset;
 }
 
 div.tab-frame table.tab {
     display:none;
     padding:5px 10px;
-    clear:left
+    clear:left;
+    border: 1px gray;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
 }
 
 /* statically support up to 9 */
