@@ -47,13 +47,15 @@ highlighting and annotations to emphasize what has changed between grammars.
          #:grammar [(maybe-literals (code:line) (#:literals (id ...)))
                     (maybe-datum-literals (code:line) (#:datum-literals (id ...)))]
 ]{
-Defines @racket[id] as a grammar to be typeset by @racket[typeset-grammar] and
-@racket[typeset-grammar-diff].
+Defines @racket[id], @racket[id-block], and @racket[id-block0] as rendering
+forms analogou to @racket[racket], @racket[racketblock], and
+@racket[racketblock0], and defines the grammar @racket[id] to be typeset by
+@racket[bettergrammar*], @racket[bettergrammar*-diff], and
+@racket[bettergrammar*-ndiff].
+
 The @racket[[id clause-datum] ...], @racket[maybe-literals], and
 @racket[maybe-datum-literals] are the same as specified by second form or
 @racket[bettergrammar*].
-
-Does not render anything by on its own.
 
 Must be used in definition context.
 
@@ -76,11 +78,51 @@ Must be used in definition context.
 @bettergrammar*[let-grammar]
 ]
 
+We can now also use @racket[let-grammar] to typeset inline examples which are
+typeset according to the grammar specification, with any datum literals or
+literals typeset as in the rendering above, and other symbols typeset as
+variables using @racket[racketvarfont].
+For example:
+
+@scribble-example|{
+@let-grammar[(let ([x 5]) x)]
+}|
+
+@scribble-renders[@let-grammar[(let ([x 5]) x)]]
+
+@scribble-example|{
+@let-grammar-block[
+(let ([x 5])
+  x)
+]
+}|
+
+@scribble-renders[
+@let-grammar-block[
+(let ([x 5])
+  x)
+]]
+
+@scribble-example|{
+@let-grammar-block0[
+(let ([x integer?])
+  x)
+]
+}|
+
+@scribble-renders[
+@let-grammar-block0[
+(let ([x integer?])
+  x)
+]]
+
 @history[
-         #:changed "1.4" @elem{Added @racket[#:literals],
-         @racket[#:datum-literals] support}
+#:changed "1.4" @elem{Added @racket[#:literals], @racket[#:datum-literals] support.}
+#:changed "1.6" @elem{Added rendering forms that obey @racket[#:literals] and
+                      @racket[#:datum-literals] used in definition.}
 ]
 }
+
 
 @defform*[((bettergrammar* maybe-literals
                            maybe-datum-literals

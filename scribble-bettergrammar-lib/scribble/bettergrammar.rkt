@@ -44,15 +44,25 @@
         (~optional (~seq #:datum-literals (did ...)))
         rest ...)
      #:with typeset-name (format-id #'name "typeset-~a" #'name)
+     #:with nameblock (format-id #'name "~a-block" #'name)
+     #:with nameblock0 (format-id #'name "~a-block0" #'name)
      #:with (dlit ...) #'(~? (did ...) ())
      #:with (lit ...) #'(~? (id ...) ())
      (quasisyntax/loc stx
        (begin
+         (define-syntax nameblock
+           (syntax-rules ()
+             [(_ e)
+              (racketblock-like #,(attribute lit) #,(attribute dlit) e)]))
+         (define-syntax nameblock0
+           (syntax-rules ()
+             [(_ e)
+              (racketblock0-like #,(attribute lit) #,(attribute dlit) e)]))
          (define-syntax name
            (grammar #'(lit ...) #'(dlit ...) (quote-syntax #,(attribute rest))
                     (syntax-rules ()
                       [(_ e)
-                       (interpose-on-racketform #f #,(attribute lit) #,(attribute dlit) e)])))))]))
+                       (racket-like #,(attribute lit) #,(attribute dlit) e)])))))]))
 
 (define datum-literal-style symbol-color)
 (define-for-syntax datum-literal-transformer
@@ -219,7 +229,7 @@
 ;; TODO: Document and maybe deprecate above interface.
 (define-syntax (interpose-on-racketform stx)
   (syntax-case stx ()
-    [(_ style (lit ...) (dlit ...) expr)
+    [(_ style racket/form (lit ...) (dlit ...) expr)
      (with-syntax ([(did ...) (map (curry format-id #'expr "~a") (syntax->list #'(dlit ...)))])
        (quasisyntax/loc stx
          (with-racket-variables (lit ...)
@@ -228,10 +238,19 @@
              (wrap style (racket/form expr))))))]))
 
 (define-syntax-rule (bnf-add lit dlit expr)
-  (interpose-on-racketform bnf-add-style lit dlit expr))
+  (interpose-on-racketform bnf-add-style racket/form lit dlit expr))
 
 (define-syntax-rule (bnf-sub lit dlit expr)
-  (interpose-on-racketform bnf-sub-style lit dlit expr))
+  (interpose-on-racketform bnf-sub-style racket/form lit dlit expr))
+
+(define-syntax-rule (racketblock-like lit dlit expr)
+  (interpose-on-racketform #f racketblock lit dlit expr))
+
+(define-syntax-rule (racket-like lit dlit expr)
+  (interpose-on-racketform #f racket lit dlit expr))
+
+(define-syntax-rule (racketblock0-like lit dlit expr)
+  (interpose-on-racketform #f racketblock0 lit dlit expr))
 
 ;; Need to extend this with code:hilite
 (require
