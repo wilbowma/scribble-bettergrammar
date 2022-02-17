@@ -50,19 +50,25 @@
      #:with (lit ...) #'(~? (id ...) ())
      (quasisyntax/loc stx
        (begin
-         (define-syntax nameblock
-           (syntax-rules ()
+         (define-syntax (nameblock stx)
+           (syntax-parse stx
+             [(_ #:datum-literals (ids (... ...)) e)
+              #'(racketblock-like #,(attribute lit) (ids (... ...) #,@(attribute dlit)) e)]
              [(_ e)
-              (racketblock-like #,(attribute lit) #,(attribute dlit) e)]))
-         (define-syntax nameblock0
-           (syntax-rules ()
+              #'(racketblock-like #,(attribute lit) #,(attribute dlit) e)]))
+         (define-syntax (nameblock0 stx)
+           (syntax-parse stx
+             [(_ #:datum-literals (ids (... ...)) e)
+              #'(racketblock-like #,(attribute lit) (ids (... ...) #,@(attribute dlit)) e)]
              [(_ e)
-              (racketblock0-like #,(attribute lit) #,(attribute dlit) e)]))
+              #'(racketblock0-like #,(attribute lit) #,(attribute dlit) e)]))
          (define-syntax name
            (grammar #'(lit ...) #'(dlit ...) (quote-syntax #,(attribute rest))
-                    (syntax-rules ()
+                    (syntax-parser
+                      [(_ #:datum-literals (ids (... ...)) e)
+                       #'(racket-like #,(attribute lit) (ids (... ...) #,@(attribute dlit)) e)]
                       [(_ e)
-                       (racket-like #,(attribute lit) #,(attribute dlit) e)])))))]))
+                       #'(racket-like #,(attribute lit) #,(attribute dlit) e)])))))]))
 
 (define datum-literal-style symbol-color)
 (define-for-syntax datum-literal-transformer
