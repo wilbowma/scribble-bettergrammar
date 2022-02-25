@@ -20,15 +20,16 @@
     font-family: 'Charter-Racket', serif;
 }
 
-div.tab-frame input{
-    display:none;
+div.tab-frame input {
+    display: none;
 }
 
-div.tab-frame label{
-    display:block;
-    float:left;
-    padding:5px 10px;
-    cursor:pointer;
+div.tab-frame label {
+    display: block;
+    float: left;
+    padding: 5px 10px;
+    margin: 0 5px 0 0;
+    cursor: pointer;
     color: #07A;
     background: rgba(80, 80, 80, .1);
 }
@@ -38,16 +39,16 @@ div.tab-frame label:hover {
     text-decoration-line: underline;
 }
 
-div.tab-frame input:checked + label{
+div.tab-frame input:checked + label {
     cursor:default;
     box-shadow: 0px -1px 2px gray;
     background: unset;
 }
 
 div.tab-frame table.tab {
-    display:none;
-    padding:5px 10px;
-    clear:left;
+    display: none;
+    padding: 5px 10px;
+    clear: left;
     border: 1px gray;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
 }
@@ -61,4 +62,4 @@ div.tab-frame input:nth-of-type(5):checked ~ .tab:nth-of-type(5),
 div.tab-frame input:nth-of-type(6):checked ~ .tab:nth-of-type(6),
 div.tab-frame input:nth-of-type(7):checked ~ .tab:nth-of-type(7),
 div.tab-frame input:nth-of-type(8):checked ~ .tab:nth-of-type(8),
-div.tab-frame input:nth-of-type(9):checked ~ .tab:nth-of-type(9){ display:block;}
+div.tab-frame input:nth-of-type(9):checked ~ .tab:nth-of-type(9){ display:block; }
