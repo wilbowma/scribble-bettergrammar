@@ -528,7 +528,8 @@
                                                             (quasisyntax/loc x
                                                               ((#,#'unsyntax (bnf-add #,lit #,dlit #,x)))))))]
           [fixup-nts (box '())])
-      (map (compose
+      (define res
+        (map (compose
             ;; Regularize the srclocs of each production. This disrupts the
             ;; original typesetting based on source locations, but that
             ;; information is disrupted anyway when computing the diff.
@@ -551,9 +552,20 @@
                          [exclude-nts
                           (when exclude-nts exclude-nts)])
                      (lambda (x)
+                       (define (is-production-included? y)
+                         (or (maybe/free-identifier=? (stx-car x) y)
+                             (and
+                              (syntax-parse x
+                                [(((~literal unsyntax) (annotator lit dlit nt))
+                                  prods ...)
+                                 (maybe/free-identifier=? (attribute nt) y)]
+                                [_ #f]))))
                        (and
                         (or (void? include-nts)
-                            (findf (curry maybe/free-identifier=? (stx-car x)) include-nts))
+                            (findf is-production-included? include-nts))
                         (or (void? exclude-nts)
-                            (not (findf (curry maybe/free-identifier=? (stx-car x)) exclude-nts))))))
-                   (syntax->list diffed-grammar))))))
+                            (not (findf is-production-included? exclude-nts))))))
+                   (syntax->list diffed-grammar))))
+      (when (null? res)
+        (error "Trying to display an empty diff"))
+      res)))
