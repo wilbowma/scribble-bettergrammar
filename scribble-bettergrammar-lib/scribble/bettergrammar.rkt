@@ -538,6 +538,20 @@
                 [(nt prods ...)
                  (quasisyntax/loc this-syntax
                    (#,(erase-srcloc (attribute nt)) #,@(map erase-srcloc (attribute prods))))]))
+            ;; Fix up when an nt is "renamed". Any added or removed nt should
+            ;; not have another annotated in any pred, but handling just the
+            ;; special case for now
+            (lambda (x)
+              (syntax-parse x
+                [(((~and us (~literal unsyntax))
+                   (annotator lit dlit nt))
+                  ((~literal unsyntax) (annotator2 lit2 dlit2 nt2))
+                  prods ...)
+                 (quasisyntax/loc x
+                   (((us (annotator lit dlit nt))
+                     (us (annotator2 lit2 dlit2 nt2)))
+                    prods ...))]
+                [_ x]))
             ;; Fix up when nt is deleted. The diff algorithm puts the annotation
             ;; in the wrong spot for typesetting.
             (lambda (x)
