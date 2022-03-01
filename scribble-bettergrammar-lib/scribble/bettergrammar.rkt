@@ -548,8 +548,10 @@
                   ((~literal unsyntax) (annotator2 lit2 dlit2 nt2))
                   prods ...)
                  (quasisyntax/loc x
-                   (((us (annotator lit dlit nt))
-                     (us (annotator2 lit2 dlit2 nt2)))
+                   ;; don't make it a list, but a sequence of elements
+                   ((us (racket
+                          (us (annotator lit dlit nt))
+                          (us (annotator2 lit2 dlit2 nt2))))
                     prods ...))]
                 [_ x]))
             ;; Fix up when nt is deleted. The diff algorithm puts the annotation
