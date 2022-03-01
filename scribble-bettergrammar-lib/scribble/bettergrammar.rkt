@@ -573,6 +573,10 @@
                                 [(((~literal unsyntax) (annotator lit dlit nt))
                                   prods ...)
                                  (maybe/free-identifier=? (attribute nt) y)]
+                                ;; This is before processing, so match the bad
+                                ;; patterns that get fixed up above.
+                                [((~literal unsyntax) (annotator lit dlit (nt prods ...)))
+                                 (maybe/free-identifier=? (attribute nt) y)]
                                 [_ #f]))))
                        (and
                         (or (void? include-nts)
