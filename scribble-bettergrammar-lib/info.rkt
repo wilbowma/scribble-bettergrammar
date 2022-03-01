@@ -6,4 +6,4 @@
     "sexp-diff-lib"))
 (define pkg-desc "A Scribble library for typesetting diffs between `racketgrammar` (implementation only, no docs or tests).")
 (define pkg-authors '(wilbowma))
-(define version "1.6.1")
+(define version "1.6.2")
