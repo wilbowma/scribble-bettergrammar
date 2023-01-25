@@ -405,7 +405,25 @@
                                   (attribute dlit))])
         #`(bettergrammar* #:literals (lit ...)
                           #:datum-literals (dlit ...)
-                          #,@annotated-grammar))]))
+                          #,@annotated-grammar))]
+     ;; Support a manually typeset diff
+     ;; Probably only used with bettergrammar*-ndiff
+     [(_ (~optional (~seq (~datum #:include)
+                          (include-nt:id ...)))
+         (~optional (~seq (~datum #:exclude)
+                          (exclude-nt:id ...)))
+         (~optional (~seq (~datum #:literals)
+                          (lid:id ...)))
+         (~optional (~seq (~datum #:datum-literals)
+                          (did:id ...)))
+         (~optional (~and #:reverse (~bind (rflag #t))))
+         clauses)
+      #:with (lit ...) #'(~? (lid ...) ())
+      #:with (dlit ...) #'(~? (did ...) ())
+      #`(bettergrammar* #:literals (lit ...)
+                        #:datum-literals (dlit ...)
+                        clauses)]
+     ))
 
 ;; TODO: reduce duplication above using grammar spec
 ;; TODO: Order independent?
