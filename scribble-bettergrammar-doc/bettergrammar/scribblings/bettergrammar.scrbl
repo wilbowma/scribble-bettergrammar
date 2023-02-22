@@ -41,7 +41,7 @@ highlighting and annotations to emphasize what has changed between grammars.
 @(define-grammar let-grammar
 #:literals (integer?)
 #:datum-literals (let)
-(e (integer? (let ([x e]) e))))
+(e integer? (let ([x e]) e)))
 
 @defform[(define-grammar maybe-literals maybe-datum-literals id [id clause-datum ...+] ...)
          #:grammar [(maybe-literals (code:line) (#:literals (id ...)))
