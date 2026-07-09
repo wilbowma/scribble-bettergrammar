@@ -244,7 +244,8 @@ Scribble element transformers, such as @racket[code:hilite].
 Typesets @racket[datum] as an addition to a @racket[bettergrammar*].
 In the default style, this means hilighting with a blue background and adding a
 @racket[+] superscript.
-You can redefine this by redefining the @tt{bnf-add} class in your style file.
+You can redefine this by redefining the @tt{bnfadd} CSS class or the
+@tt{\bnfadd} command in your style file.
 
 As it works over decoded strings, it can also be used outside of
 @racket[bettergrammar*], although this interface may change.
@@ -270,13 +271,16 @@ As it works over decoded strings, it can also be used outside of
 @scribble-renders[
 @bnf:add{natural}
 ]
+
+@history[#:changed "1.7" @elem{Renamed CSS class from @tt{bnf-add} to @tt{bnfadd}; added LaTeX/PDF support via @tt{\bnfadd} command.}]
 }
 
 @defproc[(bnf:sub [datum string?]) string?]{
 Typesets @racket[datum] as a removal from a @racket[bettergrammar*].
 In the default style, this means hilighting with a red background and adding a
 @racket[-] superscript.
-You can redefine this by redefining the @tt{bnf-sub} class in your style file.
+You can redefine this by redefining the @tt{bnfsub} CSS class or the
+@tt{\bnfsub} command in your style file.
 
 As it works over decoded strings, it can also be used outside of
 @racket[bettergrammar*], although this interface may change.
@@ -302,6 +306,8 @@ As it works over decoded strings, it can also be used outside of
 @scribble-renders[
 @bnf:sub{natural}
 ]
+
+@history[#:changed "1.7" @elem{Renamed CSS class from @tt{bnf-sub} to @tt{bnfsub}; added LaTeX/PDF support via @tt{\bnfsub} command.}]
 }
 
 @defform[(typeset-grammar id)]{
@@ -477,8 +483,8 @@ Literals should be linked properly with @racket[racket].
                      (maybe-clause-spec (code:line) clause-spec)]]{
 
 Compute and typeset a sequence of differences.
-The intention is for this to only be supported on the HTML backend, to support
-an interactive view comparing different grammars.
+In HTML output, this renders an interactive tabbed view comparing the grammars.
+In LaTeX/PDF output, only the first grammar (tab) is rendered.
 
 The main input is a sequence of clause specifications that are valid for
 @racket[bettergrammar*-diff].
@@ -548,7 +554,8 @@ The labels are used in the tabbed interface.
 ]
 ]
 
-@history[#:added "1.5"]
+@history[#:added "1.5"
+         #:changed "1.7" @elem{Added LaTeX/PDF support; only the first grammar is rendered.}]
 }
 
 

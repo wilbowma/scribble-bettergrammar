@@ -8,7 +8,7 @@
     scribble/bettergrammar
     racket/base))
 
-@(define (exercise . rest) (nested #:style "boxed" @bold{Exercise: } rest))
+@(define (exercise . rest) (nested #:style 'boxed @bold{Exercise: } rest))
 
 @title{RacketFest Demo}
 
@@ -180,7 +180,7 @@ language, to see what features might be used in the output.}
 
 @racketmodname[scribble/bettergrammar] provides @racket[bettergrammar*-ndiff],
 which types sets @racket[n] diffs with a tabbed interface.
-@margin-note{Currently undocumented; only supported by the HTML backend.}
+@margin-note{On the LaTeX backend, it renders only the first tab.}
 
 @bettergrammar*-ndiff[
 #:labels ("Source/Target" "Source v1/v2" "Target v1/v2")

@@ -8,5 +8,5 @@
     "sexp-diff-doc"))
 (define pkg-desc "Documentation for scribble-bettergrammar")
 (define pkg-authors '(wilbowma))
-(define version "1.6")
+(define version "1.7")
 (define deps '("base"))

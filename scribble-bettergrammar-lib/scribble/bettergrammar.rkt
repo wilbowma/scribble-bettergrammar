@@ -5,10 +5,12 @@
  racket/runtime-path
  racket/list
  scribble/base
+ (only-in racket/class send)
  (only-in scribble/struct make-flow make-table)
  scribble/racket
  (except-in scribble/core make-table)
  scribble/html-properties
+ scribble/latex-properties
  (except-in scribble/manual racketgrammar*)
  (except-in scribble/private/manual-vars with-racket-variables)
  scribble/private/manual-utils
@@ -32,6 +34,7 @@
 
 (define-runtime-path css-path "bettergrammar.css")
 (define-runtime-path js-path "bettergrammar-fixup.js")
+(define-runtime-path tex-path "bettergrammar.tex")
 
 (begin-for-syntax
   (provide (struct-out grammar))
@@ -208,9 +211,9 @@
      (append-map (typeset-bnf "-::=") subnonterms subclauseses)
      (append-map (typeset-bnf "::=") nonterms clauseses)))))
 
-(define better-bnf-props (list (make-css-addition css-path)))
-(define bnf-add-style (make-style "bnf-add" better-bnf-props))
-(define bnf-sub-style (make-style "bnf-sub" better-bnf-props))
+(define better-bnf-props (list (make-css-addition css-path) (tex-addition tex-path)))
+(define bnf-add-style (make-style "bnfadd" better-bnf-props))
+(define bnf-sub-style (make-style "bnfsub" better-bnf-props))
 
 ;; Backwards compatibility
 (define (bnf:add v)
@@ -475,48 +478,57 @@
       (set-box! x (add1 (unbox x)))
       (unbox x))))
 
+(define (latex-renderer? renderer)
+  (memq 'latex (send renderer current-render-mode)))
+
 (define (tabbed-view maybe-strs . grammars)
-  (compound-paragraph
-   (make-style #f '())
-   (list
-    (nested-flow
-     tab-frame-style
-     (cons
-      (paragraph
-       fixup-style
-       (apply
-        append
-        (let ([tg-id (fresh-tab-group-id)])
-          (for/list ([_ grammars]
-                     ;; maybe-strs followed by an infinite stream of #f
-                     [str (letrec ([x (stream-append maybe-strs (stream-cons #f
-                                                                             x))])
-                            x)]
-                     [n (in-naturals 1)])
-            (let ([id (fresh-tab-id)])
-              (list
-               (elem #:style (make-style #f (list
-                                             (alt-tag "input")
-                                             (make-attributes
-                                              `((type . "radio")
-                                                (name . ,(format "tab-group~a" tg-id))
-                                                (id . ,(format "tab~a" id))
-                                                ,@(if (= n 1)
-                                                      `((checked . "checked"))
-                                                      '()))))))
-               (elem (or str (format "View ~a" n))
-                     #:style (make-style #f (list
-                                             (alt-tag "label")
-                                             (make-attributes `((for . ,(format "tab~a" id)))))))))))))
-      (for/list ([g grammars])
-        ;; Grammars are tables with a #f style name
-        #;(tab-style (style-properties (table-style g)))
-        #;(with-output-to-file "log" (thunk (displayln (style-properties (table-style g)))))
-        (table (tab-style (style-properties (table-style g)))
-               (table-blockss g)))))
-    (paragraph
+  (define (html-view)
+    (compound-paragraph
      (make-style #f '())
-     (element (style #f (list do-fixup)) "")))))
+     (list
+      (nested-flow
+       tab-frame-style
+       (cons
+        (paragraph
+         fixup-style
+         (apply
+          append
+          (let ([tg-id (fresh-tab-group-id)])
+            (for/list ([_ grammars]
+                       ;; maybe-strs followed by an infinite stream of #f
+                       [str (letrec ([x (stream-append maybe-strs (stream-cons #f
+                                                                               x))])
+                              x)]
+                       [n (in-naturals 1)])
+              (let ([id (fresh-tab-id)])
+                (list
+                 (elem #:style (make-style #f (list
+                                               (alt-tag "input")
+                                               (make-attributes
+                                                `((type . "radio")
+                                                  (name . ,(format "tab-group~a" tg-id))
+                                                  (id . ,(format "tab~a" id))
+                                                  ,@(if (= n 1)
+                                                        `((checked . "checked"))
+                                                        '()))))))
+                 (elem (or str (format "View ~a" n))
+                       #:style (make-style #f (list
+                                               (alt-tag "label")
+                                               (make-attributes `((for . ,(format "tab~a" id)))))))))))))
+        (for/list ([g grammars])
+          ;; Grammars are tables with a #f style name
+          #;(tab-style (style-properties (table-style g)))
+          #;(with-output-to-file "log" (thunk (displayln (style-properties (table-style g)))))
+          (table (tab-style (style-properties (table-style g)))
+                 (table-blockss g)))))
+      (paragraph
+       (make-style #f '())
+       (element (style #f (list do-fixup)) "")))))
+  (delayed-block
+   (lambda (renderer part ri)
+     (if (latex-renderer? renderer)
+         (car grammars)
+         (html-view)))))
 
 (begin-for-syntax
   (require sexp-diff/stx-diff racket/function syntax/stx)
