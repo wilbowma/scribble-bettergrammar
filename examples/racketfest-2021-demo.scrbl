@@ -204,7 +204,7 @@ spec.
   racket/list
   scribble/core
   scribble/bettergrammar
-  cpsc411/utils/redex-gen
+  cpsc411/langs/redex-gen
   redex/reduction-semantics)
 
 @define-grammar/pred[target-v2^
